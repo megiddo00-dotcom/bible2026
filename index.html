@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>성경 1독 · 2026</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#26418F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="성경1독">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>html,body{margin:0;padding:0;background:#E9EAE3}</style>
+</head>
+<body>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap');
+:root{
+  --paper:#E9EAE3; --card:#F6F6F1; --ink:#171A18; --muted:#6E7269;
+  --rule:#CFD2C7; --accent:#26418F; --accent-soft:#26418F1a; --amber:#A9761B;
+}
+*{box-sizing:border-box}
+#bp{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",system-ui,sans-serif;
+  padding:20px 16px 48px;max-width:560px;margin:0 auto;line-height:1.5;-webkit-font-smoothing:antialiased}
+.serif{font-family:"Nanum Myeongjo",serif}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--muted);text-transform:none;margin:0 0 6px}
+.bignum{font-size:56px;font-weight:800;line-height:.9;letter-spacing:-.02em}
+.bignum small{font-size:15px;font-weight:400;margin-left:6px;letter-spacing:0}
+.sub{font-size:13px;color:var(--muted);margin-top:8px}
+.sub b{color:var(--amber);font-weight:600}
+.ticks{display:flex;gap:2px;margin:16px 0 4px;height:22px;align-items:flex-end}
+.tick{flex:1;background:var(--rule);border-radius:1px;height:9px;transition:height .25s,background .25s}
+.tick.done{background:var(--accent);height:22px}
+.tick.today{background:var(--amber);height:22px}
+.tick.miss{background:#C2B7A6;height:14px}
+hr.rule{border:0;border-top:1px solid var(--rule);margin:22px 0}
+.pills{display:flex;gap:6px;background:var(--rule);padding:3px;border-radius:10px;margin-bottom:20px}
+.pill{flex:1;border:0;background:transparent;padding:9px 6px;border-radius:8px;font:inherit;font-size:12.5px;color:var(--muted);cursor:pointer}
+.pill[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px #0000001a}
+.today-card{background:var(--card);border:1px solid var(--rule);border-left:3px solid var(--amber);border-radius:12px;padding:16px;margin-bottom:24px}
+.today-card .lbl{font-size:11px;letter-spacing:.14em;color:var(--amber);font-weight:600;margin-bottom:8px}
+.today-card .txt{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.today-card .meta{font-size:12px;color:var(--muted);margin-top:6px}
+.mh{font-size:12px;letter-spacing:.14em;color:var(--muted);padding:14px 0 8px;position:sticky;top:0;background:var(--paper);z-index:2}
+.row{display:flex;align-items:flex-start;gap:12px;padding:11px 4px;border-top:1px solid var(--rule);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.row:active{background:#00000008}
+.box{flex:0 0 20px;height:20px;margin-top:2px;border:1.5px solid var(--muted);border-radius:5px;position:relative;transition:.15s}
+.row.on .box{background:var(--accent);border-color:var(--accent)}
+.box::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) scale(0);transition:transform .15s}
+.row.on .box::after{transform:rotate(45deg) scale(1)}
+.date{flex:0 0 52px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px}
+.row.on .date,.row.on .txt2{color:#A3A79C}
+.row.on .txt2{text-decoration:line-through;text-decoration-color:#C5C9BC}
+.body{flex:1;min-width:0}
+.txt2{font-size:14.5px;line-height:1.45}
+.cnt{font-size:11.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+.row.is-today{background:#A9761B12;margin:0 -8px;padding-left:12px;padding-right:12px;border-radius:8px}
+.foot{margin-top:28px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+.reset{border:1px solid var(--rule);background:transparent;color:var(--muted);font:inherit;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer}
+.reset:active{background:#00000008}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div id="bp">
+  <p class="eyebrow">성경 1독 · 2026</p>
+  <div class="bignum serif" id="hd">—<small>일 남음</small></div>
+  <div class="sub" id="hs">불러오는 중…</div>
+  <div class="ticks" id="ticks"></div>
+  <hr class="rule">
+  <div class="pills">
+    <button class="pill" data-p="A" aria-pressed="true">균등 배분 · 하루 9장</button>
+    <button class="pill" data-p="B" aria-pressed="false">구약 집중 · 9/11 완독</button>
+  </div>
+  <div class="today-card" id="tc" hidden></div>
+  <div id="list"></div>
+  <div class="foot"><span id="ft"></span><button class="reset" id="rs">기록 지우기</button></div>
+</div>
+<script>
+const PLANS = {"A": [{"d": "2026-08-07", "r": "시편 28~39장", "v": 226, "c": 12}, {"d": "2026-08-10", "r": "시편 40~55장", "v": 230, "c": 16}, {"d": "2026-08-11", "r": "시편 56~69장", "v": 216, "c": 14}, {"d": "2026-08-12", "r": "시편 70~78장", "v": 214, "c": 9}, {"d": "2026-08-13", "r": "시편 79~91장", "v": 226, "c": 13}, {"d": "2026-08-14", "r": "시편 92~105장", "v": 240, "c": 14}, {"d": "2026-08-18", "r": "시편 106~115장", "v": 197, "c": 10}, {"d": "2026-08-19", "r": "시편 116~119장", "v": 226, "c": 4}, {"d": "2026-08-20", "r": "시편 120~142장", "v": 219, "c": 23}, {"d": "2026-08-21", "r": "시편 143~150장, 잠언 1~4장", "v": 227, "c": 12}, {"d": "2026-08-24", "r": "잠언 5~12장", "v": 240, "c": 8}, {"d": "2026-08-25", "r": "잠언 13~19장", "v": 207, "c": 7}, {"d": "2026-08-26", "r": "잠언 20~27장", "v": 232, "c": 8}, {"d": "2026-08-27", "r": "잠언 28~31장, 전도서 1~5장", "v": 211, "c": 9}, {"d": "2026-08-28", "r": "전도서 6~12장, 아가 1~6장", "v": 216, "c": 13}, {"d": "2026-08-31", "r": "아가 7~8장, 이사야 1~10장", "v": 228, "c": 12}, {"d": "2026-09-01", "r": "이사야 11~21장", "v": 220, "c": 11}, {"d": "2026-09-02", "r": "이사야 22~32장", "v": 220, "c": 11}, {"d": "2026-09-03", "r": "이사야 33~43장", "v": 215, "c": 11}, {"d": "2026-09-04", "r": "이사야 44~55장", "v": 228, "c": 12}, {"d": "2026-09-07", "r": "이사야 56~66장", "v": 209, "c": 11}, {"d": "2026-09-08", "r": "예레미야 1~9장", "v": 243, "c": 9}, {"d": "2026-09-09", "r": "예레미야 10~17장", "v": 211, "c": 8}, {"d": "2026-09-10", "r": "예레미야 18~25장", "v": 208, "c": 8}, {"d": "2026-09-11", "r": "예레미야 26~34장", "v": 234, "c": 9}, {"d": "2026-09-14", "r": "예레미야 35~42장", "v": 208, "c": 8}, {"d": "2026-09-15", "r": "예레미야 43~51장", "v": 234, "c": 9}, {"d": "2026-09-16", "r": "예레미야 52장, 예레미야애가 1~5장, 에스겔 1장", "v": 207, "c": 7}, {"d": "2026-09-17", "r": "에스겔 2~10장", "v": 243, "c": 9}, {"d": "2026-09-18", "r": "에스겔 11~18장", "v": 216, "c": 8}, {"d": "2026-09-21", "r": "에스겔 19~26장", "v": 215, "c": 8}, {"d": "2026-09-22", "r": "에스겔 27~35장", "v": 234, "c": 9}, {"d": "2026-09-23", "r": "에스겔 36~43장", "v": 208, "c": 8}, {"d": "2026-09-29", "r": "에스겔 44~48장, 다니엘 1~3장", "v": 220, "c": 8}, {"d": "2026-09-30", "r": "다니엘 4~11장", "v": 238, "c": 8}, {"d": "2026-10-01", "r": "다니엘 12장, 호세아 1~12장", "v": 198, "c": 13}, {"d": "2026-10-02", "r": "호세아 13~14장, 요엘 1~3장, 아모스 1~8장", "v": 231, "c": 13}, {"d": "2026-10-06", "r": "아모스 9장, 오바댜 1장, 요나 1~4장, 미가 1~7장, 나훔 1장", "v": 206, "c": 14}, {"d": "2026-10-07", "r": "나훔 2~3장, 하박국 1~3장, 스바냐 1~3장, 학개 1~2장, 스가랴 1~3장", "v": 224, "c": 13}, {"d": "2026-10-08", "r": "스가랴 4~14장, 말라기 1~4장", "v": 220, "c": 15}, {"d": "2026-10-12", "r": "마태복음 1~6장", "v": 234, "c": 6}, {"d": "2026-10-13", "r": "마태복음 7~12장", "v": 229, "c": 6}, {"d": "2026-10-14", "r": "마태복음 13~18장", "v": 228, "c": 6}, {"d": "2026-10-15", "r": "마태복음 19~24장", "v": 228, "c": 6}, {"d": "2026-10-16", "r": "마태복음 25~28장, 마가복음 1장", "v": 195, "c": 5}, {"d": "2026-10-19", "r": "마가복음 2~6장", "v": 215, "c": 5}, {"d": "2026-10-20", "r": "마가복음 7~12장", "v": 252, "c": 6}, {"d": "2026-10-21", "r": "마가복음 13~16장, 누가복음 1장", "v": 216, "c": 5}, {"d": "2026-10-22", "r": "누가복음 2~5장", "v": 192, "c": 4}, {"d": "2026-10-23", "r": "누가복음 6~10장", "v": 240, "c": 5}, {"d": "2026-10-26", "r": "누가복음 11~15장", "v": 240, "c": 5}, {"d": "2026-10-27", "r": "누가복음 16~19장", "v": 192, "c": 4}, {"d": "2026-10-28", "r": "누가복음 20~24장", "v": 239, "c": 5}, {"d": "2026-10-29", "r": "요한복음 1~5장", "v": 210, "c": 5}, {"d": "2026-10-30", "r": "요한복음 6~10장", "v": 210, "c": 5}, {"d": "2026-11-02", "r": "요한복음 11~16장", "v": 252, "c": 6}, {"d": "2026-11-03", "r": "요한복음 17~21장", "v": 207, "c": 5}, {"d": "2026-11-04", "r": "사도행전 1~6장", "v": 216, "c": 6}, {"d": "2026-11-05", "r": "사도행전 7~12장", "v": 216, "c": 6}, {"d": "2026-11-06", "r": "사도행전 13~18장", "v": 216, "c": 6}, {"d": "2026-11-09", "r": "사도행전 19~24장", "v": 216, "c": 6}, {"d": "2026-11-10", "r": "사도행전 25~28장, 로마서 1~3장", "v": 225, "c": 7}, {"d": "2026-11-11", "r": "로마서 4~11장", "v": 216, "c": 8}, {"d": "2026-11-12", "r": "로마서 12~16장, 고린도전서 1~4장", "v": 247, "c": 9}, {"d": "2026-11-13", "r": "고린도전서 5~12장", "v": 217, "c": 8}, {"d": "2026-11-16", "r": "고린도전서 13~16장, 고린도후서 1~5장", "v": 208, "c": 9}, {"d": "2026-11-17", "r": "고린도후서 6~13장, 갈라디아서 1~3장", "v": 232, "c": 11}, {"d": "2026-11-18", "r": "갈라디아서 4~6장, 에베소서 1~5장", "v": 204, "c": 8}, {"d": "2026-11-19", "r": "에베소서 6장, 빌립보서 1~4장, 골로새서 1~4장", "v": 224, "c": 9}, {"d": "2026-11-20", "r": "데살로니가전서 1~5장, 데살로니가후서 1~3장, 디모데전서 1~5장", "v": 231, "c": 13}, {"d": "2026-11-23", "r": "디모데전서 6장, 디모데후서 1~4장, 디도서 1~3장, 빌레몬서 1장, 히브리서 1~2장", "v": 220, "c": 11}, {"d": "2026-11-24", "r": "히브리서 3~11장", "v": 209, "c": 9}, {"d": "2026-11-25", "r": "히브리서 12~13장, 야고보서 1~5장, 베드로전서 1~4장", "v": 238, "c": 11}, {"d": "2026-11-26", "r": "베드로전서 5장, 베드로후서 1~3장, 요한일서 1~5장, 요한이서 1장, 요한삼서 1장", "v": 214, "c": 11}, {"d": "2026-11-27", "r": "유다서 1장, 요한계시록 1~10장", "v": 213, "c": 11}, {"d": "2026-11-30", "r": "요한계시록 11~22장", "v": 216, "c": 12}], "B": [{"d": "2026-08-07", "r": "시편 28~49장", "v": 369, "c": 22}, {"d": "2026-08-10", "r": "시편 50~72장", "v": 352, "c": 23}, {"d": "2026-08-11", "r": "시편 73~89장", "v": 358, "c": 17}, {"d": "2026-08-12", "r": "시편 90~107장", "v": 364, "c": 18}, {"d": "2026-08-13", "r": "시편 108~119장", "v": 332, "c": 12}, {"d": "2026-08-14", "r": "시편 120~150장, 잠언 1장", "v": 356, "c": 32}, {"d": "2026-08-18", "r": "잠언 2~13장", "v": 360, "c": 12}, {"d": "2026-08-19", "r": "잠언 14~25장", "v": 351, "c": 12}, {"d": "2026-08-20", "r": "잠언 26~31장, 전도서 1~10장", "v": 360, "c": 16}, {"d": "2026-08-21", "r": "전도서 11~12장, 아가 1~8장, 이사야 1~10장", "v": 353, "c": 20}, {"d": "2026-08-24", "r": "이사야 11~27장", "v": 340, "c": 17}, {"d": "2026-08-25", "r": "이사야 28~45장", "v": 353, "c": 18}, {"d": "2026-08-26", "r": "이사야 46~64장", "v": 361, "c": 19}, {"d": "2026-08-27", "r": "이사야 65~66장, 예레미야 1~12장", "v": 362, "c": 14}, {"d": "2026-08-28", "r": "예레미야 13~25장", "v": 338, "c": 13}, {"d": "2026-08-31", "r": "예레미야 26~39장", "v": 364, "c": 14}, {"d": "2026-09-01", "r": "예레미야 40~52장, 예레미야애가 1장", "v": 369, "c": 14}, {"d": "2026-09-02", "r": "예레미야애가 2~5장, 에스겔 1~8장", "v": 339, "c": 12}, {"d": "2026-09-03", "r": "에스겔 9~21장", "v": 351, "c": 13}, {"d": "2026-09-04", "r": "에스겔 22~35장", "v": 368, "c": 14}, {"d": "2026-09-07", "r": "에스겔 36~48장", "v": 338, "c": 13}, {"d": "2026-09-08", "r": "다니엘 1~12장", "v": 357, "c": 12}, {"d": "2026-09-09", "r": "호세아 1~14장, 요엘 1~3장, 아모스 1~5장", "v": 352, "c": 22}, {"d": "2026-09-10", "r": "아모스 6~9장, 오바댜 1장, 요나 1~4장, 미가 1~7장, 나훔 1~3장, 하박국 1~3장, 스바냐 1장", "v": 359, "c": 23}, {"d": "2026-09-11", "r": "스바냐 2~3장, 학개 1~2장, 스가랴 1~14장, 말라기 1~4장", "v": 339, "c": 22}, {"d": "2026-09-14", "r": "마태복음 1~5장", "v": 195, "c": 5}, {"d": "2026-09-15", "r": "마태복음 6~9장", "v": 154, "c": 4}, {"d": "2026-09-16", "r": "마태복음 10~13장", "v": 152, "c": 4}, {"d": "2026-09-17", "r": "마태복음 14~17장", "v": 152, "c": 4}, {"d": "2026-09-18", "r": "마태복음 18~21장", "v": 152, "c": 4}, {"d": "2026-09-21", "r": "마태복음 22~25장", "v": 152, "c": 4}, {"d": "2026-09-22", "r": "마태복음 26~28장, 마가복음 1장", "v": 157, "c": 4}, {"d": "2026-09-23", "r": "마가복음 2~5장", "v": 172, "c": 4}, {"d": "2026-09-29", "r": "마가복음 6~8장", "v": 127, "c": 3}, {"d": "2026-09-30", "r": "마가복음 9~12장", "v": 168, "c": 4}, {"d": "2026-10-01", "r": "마가복음 13~16장", "v": 168, "c": 4}, {"d": "2026-10-02", "r": "누가복음 1~3장", "v": 144, "c": 3}, {"d": "2026-10-06", "r": "누가복음 4~6장", "v": 144, "c": 3}, {"d": "2026-10-07", "r": "누가복음 7~10장", "v": 192, "c": 4}, {"d": "2026-10-08", "r": "누가복음 11~13장", "v": 144, "c": 3}, {"d": "2026-10-12", "r": "누가복음 14~16장", "v": 144, "c": 3}, {"d": "2026-10-13", "r": "누가복음 17~19장", "v": 144, "c": 3}, {"d": "2026-10-14", "r": "누가복음 20~23장", "v": 192, "c": 4}, {"d": "2026-10-15", "r": "누가복음 24장, 요한복음 1~2장", "v": 131, "c": 3}, {"d": "2026-10-16", "r": "요한복음 3~6장", "v": 168, "c": 4}, {"d": "2026-10-19", "r": "요한복음 7~9장", "v": 126, "c": 3}, {"d": "2026-10-20", "r": "요한복음 10~13장", "v": 168, "c": 4}, {"d": "2026-10-21", "r": "요한복음 14~17장", "v": 168, "c": 4}, {"d": "2026-10-22", "r": "요한복음 18~21장", "v": 165, "c": 4}, {"d": "2026-10-23", "r": "사도행전 1~4장", "v": 144, "c": 4}, {"d": "2026-10-26", "r": "사도행전 5~8장", "v": 144, "c": 4}, {"d": "2026-10-27", "r": "사도행전 9~13장", "v": 180, "c": 5}, {"d": "2026-10-28", "r": "사도행전 14~17장", "v": 144, "c": 4}, {"d": "2026-10-29", "r": "사도행전 18~21장", "v": 144, "c": 4}, {"d": "2026-10-30", "r": "사도행전 22~26장", "v": 180, "c": 5}, {"d": "2026-11-02", "r": "사도행전 27~28장, 로마서 1~2장", "v": 126, "c": 4}, {"d": "2026-11-03", "r": "로마서 3~8장", "v": 162, "c": 6}, {"d": "2026-11-04", "r": "로마서 9~14장", "v": 162, "c": 6}, {"d": "2026-11-05", "r": "로마서 15~16장, 고린도전서 1~4장", "v": 166, "c": 6}, {"d": "2026-11-06", "r": "고린도전서 5~9장", "v": 136, "c": 5}, {"d": "2026-11-09", "r": "고린도전서 10~15장", "v": 162, "c": 6}, {"d": "2026-11-10", "r": "고린도전서 16장, 고린도후서 1~6장", "v": 147, "c": 7}, {"d": "2026-11-11", "r": "고린도후서 7~13장, 갈라디아서 1장", "v": 162, "c": 8}, {"d": "2026-11-12", "r": "갈라디아서 2~6장, 에베소서 1장", "v": 150, "c": 6}, {"d": "2026-11-13", "r": "에베소서 2~6장, 빌립보서 1장", "v": 155, "c": 6}, {"d": "2026-11-16", "r": "빌립보서 2~4장, 골로새서 1~4장", "v": 173, "c": 7}, {"d": "2026-11-17", "r": "데살로니가전서 1~5장, 데살로니가후서 1~3장, 디모데전서 1장", "v": 155, "c": 9}, {"d": "2026-11-18", "r": "디모데전서 2~6장, 디모데후서 1~3장", "v": 157, "c": 8}, {"d": "2026-11-19", "r": "디모데후서 4장, 디도서 1~3장, 빌레몬서 1장, 히브리서 1~2장", "v": 139, "c": 7}, {"d": "2026-11-20", "r": "히브리서 3~9장", "v": 163, "c": 7}, {"d": "2026-11-23", "r": "히브리서 10~13장, 야고보서 1~3장", "v": 158, "c": 7}, {"d": "2026-11-24", "r": "야고보서 4~5장, 베드로전서 1~5장", "v": 147, "c": 7}, {"d": "2026-11-25", "r": "베드로후서 1~3장, 요한일서 1~5장", "v": 166, "c": 8}, {"d": "2026-11-26", "r": "요한이서 1장, 요한삼서 1장, 유다서 1장, 요한계시록 1~5장", "v": 147, "c": 8}, {"d": "2026-11-27", "r": "요한계시록 6~14장", "v": 165, "c": 9}, {"d": "2026-11-30", "r": "요한계시록 15~22장", "v": 144, "c": 8}]};
+const WD = ["월","화","수","목","금","토","일"];
+let plan = "A", done = new Set();
+const key = p => "bible2026:" + p;
+const todayISO = new Date().toISOString().slice(0,10);
+
+const hasArtifactStore = typeof window.storage !== "undefined";
+async function load(){
+  try{
+    if(hasArtifactStore){ const r = await window.storage.get(key(plan)); done = new Set(JSON.parse(r.value)); }
+    else { done = new Set(JSON.parse(localStorage.getItem(key(plan)) || "[]")); }
+  } catch(e){ done = new Set(); }
+  render();
+}
+async function save(){
+  try{
+    if(hasArtifactStore) await window.storage.set(key(plan), JSON.stringify([...done]));
+    else localStorage.setItem(key(plan), JSON.stringify([...done]));
+  } catch(e){ document.getElementById("ft").textContent = "저장 실패 — 화면에만 반영됩니다"; }
+}
+
+function render(){
+  const days = PLANS[plan];
+  const left = days.filter(d => !done.has(d.d)).length;
+  const missed = days.filter(d => d.d < todayISO && !done.has(d.d)).length;
+  document.getElementById("hd").innerHTML = left + '<small>일 남음</small>';
+  const pct = Math.round((days.length-left)/days.length*100);
+  document.getElementById("hs").innerHTML =
+    `${days.length-left} / ${days.length}일 완료 · ${pct}%` +
+    (missed ? ` · <b>밀린 날 ${missed}일</b>` : "");
+
+  document.getElementById("ticks").innerHTML = days.map(d =>
+    `<i class="tick ${done.has(d.d)?"done":d.d===todayISO?"today":d.d<todayISO?"miss":""}"></i>`).join("");
+
+  const t = days.find(d => d.d === todayISO);
+  const tc = document.getElementById("tc");
+  if(t){
+    tc.hidden = false;
+    tc.innerHTML = `<div class="lbl">오늘 ${t.d.slice(5).replace("-","/")} (${WD[new Date(t.d).getDay()===0?6:new Date(t.d).getDay()-1]})</div>
+      <div class="txt">${t.r}</div><div class="meta">${t.c}장 · 약 ${t.v}절</div>`;
+  } else {
+    const next = days.find(d => d.d >= todayISO);
+    tc.hidden = false;
+    tc.innerHTML = next
+      ? `<div class="lbl">오늘은 쉬는 날</div><div class="txt">다음 읽기 ${next.d.slice(5).replace("-","/")}</div><div class="meta">${next.r}</div>`
+      : `<div class="lbl">완독</div><div class="txt">1독을 마쳤습니다</div>`;
+  }
+
+  let html = "", m = null;
+  days.forEach(d => {
+    const mm = +d.d.slice(5,7);
+    if(mm !== m){ m = mm; html += `<div class="mh">${m}월</div>`; }
+    const dt = new Date(d.d), w = WD[dt.getDay()===0?6:dt.getDay()-1];
+    html += `<div class="row ${done.has(d.d)?"on":""} ${d.d===todayISO?"is-today":""}" data-d="${d.d}" role="checkbox"
+      aria-checked="${done.has(d.d)}" tabindex="0">
+      <span class="box"></span><span class="date">${+d.d.slice(5,7)}/${+d.d.slice(8)} ${w}</span>
+      <span class="body"><span class="txt2">${d.r}</span><div class="cnt">${d.c}장 · ${d.v}절</div></span></div>`;
+  });
+  document.getElementById("list").innerHTML = html;
+  const total = days.reduce((s,d)=>s+d.c,0), readCh = days.filter(d=>done.has(d.d)).reduce((s,d)=>s+d.c,0);
+  document.getElementById("ft").textContent = `${readCh} / ${total}장`;
+}
+
+function toggle(el){
+  const d = el.dataset.d;
+  done.has(d) ? done.delete(d) : done.add(d);
+  save(); render();
+}
+document.getElementById("list").addEventListener("click", e => {
+  const r = e.target.closest(".row"); if(r) toggle(r);
+});
+document.getElementById("list").addEventListener("keydown", e => {
+  if(e.key===" "||e.key==="Enter"){ const r=e.target.closest(".row"); if(r){ e.preventDefault(); toggle(r);} }
+});
+document.querySelectorAll(".pill").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".pill").forEach(x => x.setAttribute("aria-pressed", x===b));
+  plan = b.dataset.p; load();
+}));
+document.getElementById("rs").addEventListener("click", async () => {
+  done = new Set(); await save(); render();
+});
+load();
+</script>
+
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
