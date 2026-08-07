@@ -320,6 +320,24 @@ nav.tabbar{
   color:var(--ink-soft);font-size:.7rem;font-weight:700;vertical-align:super;margin-right:4px;
 }
 .rd-verse.now{background:var(--gold-soft);border-radius:6px;box-shadow:0 0 0 4px var(--gold-soft)}
+.rd-verse{cursor:pointer}
+.rd-easy{
+  display:none;margin:2px 0 10px 14px;padding:9px 13px;
+  background:#F9F1EA;border-left:3px solid #C97B4F;border-radius:0 12px 12px 0;
+  color:#7A4326;font-size:.93rem;line-height:1.75;word-break:keep-all;
+}
+.rd-easy .etag{
+  display:inline-block;font-size:.63rem;font-weight:700;color:#fff;
+  background:#C97B4F;border-radius:8px;padding:1px 7px;margin-right:7px;vertical-align:2px;
+}
+.rd-easy.show{display:block}
+.easy-all .rd-easy{display:block}
+.rd-easy-btn{
+  border:1px solid #E0C4B2;background:#FBF5F0;color:#A05A33;font-weight:700;
+  font-size:.78rem;border-radius:10px;padding:7px 10px;cursor:pointer;
+  font-family:var(--sans);flex-shrink:0;white-space:nowrap;
+}
+.rd-easy-btn.on{background:#C97B4F;border-color:#C97B4F;color:#fff}
 .reader-ctrl{
   display:flex;gap:8px;padding:12px 16px;background:var(--card);
   border-top:1px solid var(--line);
@@ -497,6 +515,16 @@ nav.tabbar{
         <div class="set-desc" id="audioStatus" style="margin-top:10px"></div>
         <input type="file" id="fileImportF" accept=".mp3,audio/mpeg" multiple hidden>
         <input type="file" id="fileImportM" accept=".mp3,audio/mpeg" multiple hidden>
+        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+          <div class="set-title">📙 쉬운성경 함께 보기</div>
+          <div class="set-desc">쉬운성경.json 파일을 가져오면 읽어주기 화면에서 <b>절을 누르거나 [쉬운성경] 버튼</b>으로 쉬운 번역을 함께 볼 수 있습니다. 파일은 이 기기에만 저장됩니다.</div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn-outline" id="btnEasyImport">쉬운성경 가져오기</button>
+            <button class="btn-outline" id="btnEasyClear" style="color:var(--danger)">삭제</button>
+          </div>
+          <div class="set-desc" id="easyStatus" style="margin-top:8px"></div>
+          <input type="file" id="fileEasy" accept=".json,application/json" hidden>
+        </div>
       </div>
       <div class="set-row">
         <div>
@@ -537,6 +565,7 @@ nav.tabbar{
   <div class="reader-head">
     <button class="rd-close" id="rdClose" aria-label="닫기">✕</button>
     <div class="rd-title" id="rdTitle"></div>
+    <button class="rd-easy-btn" id="rdEasyBtn" style="display:none">쉬운성경</button>
     <select class="rd-rate" id="rdVoice">
       <option value="female">여성</option>
       <option value="male">남성</option>
@@ -1124,6 +1153,45 @@ function loadKRV(){
   return krvLoading;
 }
 
+/* ---- 쉬운성경 (기기 내 저장, 공개 배포 안 함) ---- */
+let EASY=null, easyChecked=false;
+function easyDb(){
+  return new Promise((res,rej)=>{
+    const rq=indexedDB.open("btr-easy",1);
+    rq.onupgradeneeded=()=>rq.result.createObjectStore("kv");
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error);
+  });
+}
+async function easyLoad(){
+  if(easyChecked) return EASY;
+  easyChecked=true;
+  try{
+    const db=await easyDb();
+    EASY=await new Promise((res,rej)=>{
+      const rq=db.transaction("kv","readonly").objectStore("kv").get("easy");
+      rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>rej(rq.error);
+    });
+  }catch(e){ EASY=null; }
+  return EASY;
+}
+async function easySave(obj){
+  const db=await easyDb();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("kv","readwrite");
+    tx.objectStore("kv").put(obj,"easy");
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  });
+}
+async function easyClear(){
+  const db=await easyDb();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("kv","readwrite");
+    tx.objectStore("kv").delete("easy");
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  });
+}
+
 const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null, mode:null, token:0 };
 const audioEl=new Audio();
 audioEl.preload="auto";
@@ -1146,6 +1214,8 @@ async function openReader(startCi){
   reader.qi=Math.max(0,Math.min(startCi,sch.chapters.length-1));
   reader.vi=0;
   reader.open=true;
+  await easyLoad();
+  $("rdEasyBtn").style.display = EASY ? "" : "none";
   $("rdVoice").value=voiceGender();
   $("reader").hidden=false;
   renderReaderChapter();
@@ -1162,11 +1232,18 @@ function renderReaderChapter(){
   $("rdTitle").textContent=`${c.book} ${c.ch}장 (${reader.qi+1}/${reader.queue.length})`;
   const body=$("rdBody");
   body.innerHTML="";
+  const ez = EASY && EASY[c.id] && EASY[c.id][String(c.ch)];
   readerVerses().forEach((v,i)=>{
     const p=document.createElement("p");
     p.className="rd-verse"; p.id="rdv-"+i;
     p.innerHTML=`<span class="vn">${i+1}</span>${v}`;
     body.appendChild(p);
+    if(ez && ez[i]){
+      const e=document.createElement("div");
+      e.className="rd-easy";
+      e.innerHTML=`<span class="etag">쉬운성경</span>${ez[i]}`;
+      body.appendChild(e);
+    }
   });
   body.scrollTop=0;
   updatePlayBtn();
@@ -1348,6 +1425,19 @@ $("rdVoice").onchange=()=>{
   toast(($("rdVoice").value==="male"?"남성":"여성")+" 음성으로 변경");
   if(was) startPlayback();
 };
+$("rdBody").addEventListener("click",e=>{
+  const ezClicked=e.target.closest(".rd-easy");
+  if(ezClicked){ ezClicked.classList.remove("show"); return; }
+  const pv=e.target.closest(".rd-verse");
+  if(!pv) return;
+  const nx=pv.nextElementSibling;
+  if(nx && nx.classList.contains("rd-easy")) nx.classList.toggle("show");
+});
+$("rdEasyBtn").onclick=()=>{
+  const on=$("rdBody").classList.toggle("easy-all");
+  $("rdEasyBtn").classList.toggle("on",on);
+  toast(on ? "쉬운성경 전체 표시" : "쉬운성경 숨김 (절을 누르면 개별 표시)");
+};
 $("rdClose").onclick=()=>{
   stopPlayback(false);
   reader.open=false;
@@ -1402,6 +1492,37 @@ async function importAudio(gender, files){
   toast(`완료: ${ok}개 저장${skip?`, ${skip}개 파일명 인식 불가`:""}`);
   refreshAudioStatus();
 }
+async function refreshEasyStatus(){
+  await easyLoad();
+  $("easyStatus").textContent = EASY
+    ? `✓ 쉬운성경이 저장되어 있습니다 (${Object.keys(EASY).length}권)`
+    : "저장된 쉬운성경이 없습니다.";
+}
+$("btnEasyImport").onclick=()=>$("fileEasy").click();
+$("fileEasy").onchange=async e=>{
+  const f=e.target.files[0];
+  e.target.value="";
+  if(!f) return;
+  try{
+    toast("쉬운성경 저장 중...");
+    const obj=JSON.parse(await f.text());
+    if(!obj || typeof obj!=="object" || !obj.gn) throw new Error("format");
+    await easySave(obj);
+    EASY=obj; easyChecked=true;
+    toast("✓ 쉬운성경을 저장했습니다");
+    refreshEasyStatus();
+  }catch(err){
+    toast("파일을 인식하지 못했습니다. 쉬운성경.json이 맞는지 확인하세요");
+  }
+};
+$("btnEasyClear").onclick=async()=>{
+  if(!confirm("저장된 쉬운성경을 삭제할까요?")) return;
+  await easyClear();
+  EASY=null;
+  toast("쉬운성경을 삭제했습니다");
+  refreshEasyStatus();
+};
+refreshEasyStatus();
 $("btnImportF").onclick=()=>$("fileImportF").click();
 $("btnImportM").onclick=()=>$("fileImportM").click();
 $("fileImportF").onchange=e=>{ importAudio("female", e.target.files); e.target.value=""; };
