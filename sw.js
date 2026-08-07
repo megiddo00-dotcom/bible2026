@@ -1,5 +1,5 @@
 /* 말씀의 여정 - Service Worker */
-const CACHE = "btr-v8";
+const CACHE = "btr-v10";
 const ASSETS = [
   "./",
   "./index.html",
@@ -28,8 +28,11 @@ self.addEventListener("fetch", e => {
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
+        // 낭독 MP3는 용량이 커서 캐시하지 않음 (스트리밍 재생)
+        if (!e.request.url.includes(".mp3")) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
+        }
         return res;
       })
       .catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))

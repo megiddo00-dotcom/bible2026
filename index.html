@@ -483,6 +483,21 @@ nav.tabbar{
           ③ 방해금지 모드가 켜져 있으면 팝업이 표시되지 않습니다
         </div>
       </div>
+      <div class="set-row" style="display:block">
+        <div class="set-title">🎧 낭독 음원 관리</div>
+        <div class="set-desc">
+          MP3 낭독 파일을 휴대폰에 저장해두면 인터넷 없이 재생됩니다.<br>
+          PC에서 생성한 audio 폴더의 mp3 파일들을 폰으로 복사한 뒤, 아래 버튼으로 전체 선택해서 가져오세요.
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn-outline" id="btnImportF">여성 음원 가져오기</button>
+          <button class="btn-outline" id="btnImportM">남성 음원 가져오기</button>
+          <button class="btn-outline" id="btnAudioClear" style="color:var(--danger)">저장 음원 삭제</button>
+        </div>
+        <div class="set-desc" id="audioStatus" style="margin-top:10px"></div>
+        <input type="file" id="fileImportF" accept=".mp3,audio/mpeg" multiple hidden>
+        <input type="file" id="fileImportM" accept=".mp3,audio/mpeg" multiple hidden>
+      </div>
       <div class="set-row">
         <div>
           <div class="set-title">기록 초기화</div>
@@ -522,6 +537,10 @@ nav.tabbar{
   <div class="reader-head">
     <button class="rd-close" id="rdClose" aria-label="닫기">✕</button>
     <div class="rd-title" id="rdTitle"></div>
+    <select class="rd-rate" id="rdVoice">
+      <option value="female">여성</option>
+      <option value="male">남성</option>
+    </select>
     <select class="rd-rate" id="rdRate">
       <option value="0.8">0.8배속</option>
       <option value="1" selected>1.0배속</option>
@@ -535,7 +554,7 @@ nav.tabbar{
     <button class="rd-main" id="rdPlay">▶ 재생</button>
     <button id="rdNext">다음 장 ⏭</button>
   </div>
-  <div class="rd-hint">장이 끝나면 자동으로 체크되고 다음 장으로 이어집니다 · 개역한글판 · 재생 중에는 화면이 꺼지지 않아요</div>
+  <div class="rd-hint">장이 끝나면 자동 체크 후 다음 장으로 이어집니다 · 개역한글 낭독(남/여 선택) · 재생 중 화면 꺼짐 방지</div>
 </div>
 
 <div id="toast"></div>
@@ -1089,8 +1108,9 @@ chListEl.addEventListener("pointercancel",dragEnd);
 chListEl.addEventListener("touchmove",e=>{ if(drag && drag.active) e.preventDefault(); },{passive:false});
 
 /* ============================================================
-   개역한글 읽어주기 (Web Speech API)
+   개역한글 읽어주기 — MP3 낭독 음원 우선, 없으면 기기 TTS 폴백
 ============================================================ */
+const AUDIO_BASE="audio/";   // 음원을 별도 저장소에 올리면 전체 URL로 변경
 let KRV=null, krvLoading=null;
 function loadKRV(){
   if(KRV) return Promise.resolve(KRV);
@@ -1104,26 +1124,29 @@ function loadKRV(){
   return krvLoading;
 }
 
-const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null };
+const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null, mode:null };
+const audioEl=new Audio();
+audioEl.preload="auto";
+const mp3Dead={};   // 성별별: 음원 404 시 세션 내 재시도 방지
+
+function voiceGender(){ return store.settings.voiceGender || "female"; }
+function ttsRate(){ return parseFloat($("rdRate").value); }
+function audioUrl(c){ return AUDIO_BASE+voiceGender()+"/"+c.id+"-"+c.ch+".mp3"; }
 
 function koVoice(){
   const vs=speechSynthesis.getVoices();
   return vs.find(v=>/^ko/i.test(v.lang)) || null;
 }
-if("speechSynthesis" in window){
-  speechSynthesis.onvoiceschanged=()=>{};
-}
+if("speechSynthesis" in window){ speechSynthesis.onvoiceschanged=()=>{}; }
 
 async function openReader(startCi){
-  if(!("speechSynthesis" in window)){
-    toast("이 브라우저는 음성 읽기를 지원하지 않습니다"); return;
-  }
   try{ await loadKRV(); }catch(e){ return; }
   const sch=SCHEDULE[viewIndex];
   reader.queue=sch.chapters;
   reader.qi=Math.max(0,Math.min(startCi,sch.chapters.length-1));
   reader.vi=0;
   reader.open=true;
+  $("rdVoice").value=voiceGender();
   $("reader").hidden=false;
   renderReaderChapter();
 }
@@ -1155,6 +1178,99 @@ function highlightVerse(i){
   if(el){ el.classList.add("now"); el.scrollIntoView({block:"center",behavior:"smooth"}); }
 }
 
+/* ---- MP3 재생: 글자수 비율로 현재 절 근사 하이라이트 ---- */
+function verseEndFractions(){
+  const vs=readerVerses();
+  const lens=vs.map(v=>v.length);
+  const tot=lens.reduce((a,b)=>a+b,0)||1;
+  let cum=0;
+  return lens.map(l=>{ cum+=l; return cum/tot; });
+}
+audioEl.addEventListener("timeupdate",()=>{
+  if(reader.mode!=="mp3" || !audioEl.duration) return;
+  const f=audioEl.currentTime/audioEl.duration;
+  const fr=verseEndFractions();
+  let i=fr.findIndex(x=>f<x);
+  if(i<0) i=fr.length-1;
+  if(i!==reader.vi){ reader.vi=i; highlightVerse(i); }
+});
+audioEl.addEventListener("ended",()=>{ if(reader.mode==="mp3" && reader.playing) chapterDone(); });
+
+/* ---- 로컬 음원 저장소 (IndexedDB) ---- */
+function adbOpen(){
+  return new Promise((res,rej)=>{
+    const rq=indexedDB.open("btr-audio",1);
+    rq.onupgradeneeded=()=>rq.result.createObjectStore("files");
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error);
+  });
+}
+async function audioPut(key,blob){
+  const db=await adbOpen();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("files","readwrite");
+    tx.objectStore("files").put(blob,key);
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  });
+}
+async function audioGet(key){
+  const db=await adbOpen();
+  return new Promise((res,rej)=>{
+    const rq=db.transaction("files","readonly").objectStore("files").get(key);
+    rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>rej(rq.error);
+  });
+}
+async function audioKeys(){
+  const db=await adbOpen();
+  return new Promise((res,rej)=>{
+    const rq=db.transaction("files","readonly").objectStore("files").getAllKeys();
+    rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>rej(rq.error);
+  });
+}
+async function audioClearAll(){
+  const db=await adbOpen();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("files","readwrite");
+    tx.objectStore("files").clear();
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  });
+}
+
+async function tryMp3(){
+  reader.mode="mp3";
+  const c=readerChapter();
+  const key=voiceGender()+"/"+c.id+"-"+c.ch;
+  const resume = audioEl.dataset.key===key && audioEl.currentTime>0 && !audioEl.ended;
+  if(!resume){
+    if(audioEl.dataset.blobUrl){ URL.revokeObjectURL(audioEl.dataset.blobUrl); delete audioEl.dataset.blobUrl; }
+    audioEl.dataset.key=key;
+    const blob=await audioGet(key).catch(()=>null);   // 1순위: 폰에 저장된 음원
+    if(blob){
+      const bu=URL.createObjectURL(blob);
+      audioEl.dataset.blobUrl=bu;
+      audioEl.src=bu;
+    }else{
+      audioEl.src=audioUrl(c);                        // 2순위: 웹(깃허브) 음원
+    }
+  }
+  if(!reader.playing) return;
+  audioEl.playbackRate=ttsRate();
+  audioEl.onerror=()=>{ if(reader.playing) fallbackTTS(true); };
+  audioEl.play().catch(()=>{ if(reader.playing) fallbackTTS(true); });
+}
+
+/* ---- TTS 폴백 ---- */
+function fallbackTTS(markDead){
+  if(markDead && !mp3Dead[voiceGender()]){
+    mp3Dead[voiceGender()]=true;
+    toast("낭독 음원을 찾지 못해 기기 음성으로 재생합니다");
+  }
+  if(!("speechSynthesis" in window)){
+    stopPlayback(); toast("이 브라우저는 음성 재생을 지원하지 않습니다"); return;
+  }
+  reader.mode="tts";
+  speakFrom(reader.vi||0);
+}
 function speakFrom(vi){
   const verses=readerVerses();
   if(vi>=verses.length){ chapterDone(); return; }
@@ -1163,55 +1279,72 @@ function speakFrom(vi){
   const u=new SpeechSynthesisUtterance(verses[vi]);
   u.lang="ko-KR";
   const v=koVoice(); if(v) u.voice=v;
-  u.rate=parseFloat($("rdRate").value);
-  u.onend=()=>{ if(reader.playing) speakFrom(vi+1); };
-  u.onerror=()=>{ if(reader.playing) speakFrom(vi+1); };
+  u.rate=ttsRate();
+  u.onend=()=>{ if(reader.playing && reader.mode==="tts") speakFrom(vi+1); };
+  u.onerror=()=>{ if(reader.playing && reader.mode==="tts") speakFrom(vi+1); };
   speechSynthesis.speak(u);
 }
 
+/* ---- 공통 제어 ---- */
 function chapterDone(){
   const c=readerChapter();
   if(!isRead(c)){ setRead(c,true); render(); syncToSW(); }
   if(reader.qi+1<reader.queue.length){
     reader.qi++; reader.vi=0;
+    delete audioEl.dataset.key;
     renderReaderChapter();
-    if(reader.playing) speakFrom(0);
+    if(reader.playing) startPlayback();
   }else{
-    stopSpeak();
+    stopPlayback();
     toast("🎉 오늘 분량 읽어주기 완료!");
     if(navigator.vibrate) navigator.vibrate([60,40,60]);
   }
 }
-
-async function startSpeak(){
+async function startPlayback(){
   reader.playing=true;
-  speechSynthesis.cancel();
-  speakFrom(reader.vi);
   updatePlayBtn();
+  speechSynthesis.cancel();
+  if(mp3Dead[voiceGender()]) fallbackTTS(false);
+  else tryMp3();
   try{ reader.wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
 }
-function stopSpeak(){
+function stopPlayback(keepPos){
   reader.playing=false;
-  speechSynthesis.cancel();
   updatePlayBtn();
+  audioEl.pause();
+  if(!keepPos){ delete audioEl.dataset.key; try{audioEl.currentTime=0;}catch(e){} }
+  speechSynthesis.cancel();
   if(reader.wakeLock){ reader.wakeLock.release().catch(()=>{}); reader.wakeLock=null; }
 }
 function updatePlayBtn(){
   $("rdPlay").textContent = reader.playing ? "⏸ 일시정지" : "▶ 재생";
 }
+function jumpChapter(delta){
+  const t=reader.qi+delta;
+  if(t<0 || t>=reader.queue.length) return;
+  reader.qi=t; reader.vi=0;
+  delete audioEl.dataset.key;
+  renderReaderChapter();
+  if(reader.playing){ speechSynthesis.cancel(); audioEl.pause(); startPlayback(); }
+}
 
-$("rdPlay").onclick=()=>{ reader.playing ? stopSpeak() : startSpeak(); };
-$("rdPrev").onclick=()=>{
-  if(reader.qi>0){ reader.qi--; reader.vi=0; renderReaderChapter(); if(reader.playing){ speechSynthesis.cancel(); speakFrom(0);} }
-};
-$("rdNext").onclick=()=>{
-  if(reader.qi+1<reader.queue.length){ reader.qi++; reader.vi=0; renderReaderChapter(); if(reader.playing){ speechSynthesis.cancel(); speakFrom(0);} }
-};
+$("rdPlay").onclick=()=>{ reader.playing ? stopPlayback(true) : startPlayback(); };
+$("rdPrev").onclick=()=>jumpChapter(-1);
+$("rdNext").onclick=()=>jumpChapter(1);
 $("rdRate").onchange=()=>{
-  if(reader.playing){ speechSynthesis.cancel(); speakFrom(reader.vi); }
+  if(reader.mode==="mp3"){ audioEl.playbackRate=ttsRate(); }
+  else if(reader.playing){ speechSynthesis.cancel(); speakFrom(reader.vi); }
+};
+$("rdVoice").onchange=()=>{
+  const s=store.settings; s.voiceGender=$("rdVoice").value; store.settings=s;
+  const was=reader.playing;
+  stopPlayback(false);
+  reader.vi=0;
+  toast(($("rdVoice").value==="male"?"남성":"여성")+" 음성으로 변경");
+  if(was) startPlayback();
 };
 $("rdClose").onclick=()=>{
-  stopSpeak();
+  stopPlayback(false);
   reader.open=false;
   $("reader").hidden=true;
 };
@@ -1219,14 +1352,62 @@ $("btnListenDay").onclick=()=>{
   const sch=SCHEDULE[viewIndex];
   let start=sch.chapters.findIndex(c=>!isRead(c));
   if(start<0) start=0;
-  openReader(start).then(()=>startSpeak());
+  openReader(start).then(()=>{ if(reader.open) startPlayback(); });
 };
-// 화면 복귀 시 wake lock 재획득
 document.addEventListener("visibilitychange",()=>{
   if(!document.hidden && reader.playing && !reader.wakeLock){
     navigator.wakeLock?.request("screen").then(w=>reader.wakeLock=w).catch(()=>{});
   }
 });
+
+/* ---- 음원 가져오기 / 관리 ---- */
+async function refreshAudioStatus(){
+  try{
+    const keys=await audioKeys();
+    const f=keys.filter(k=>k.startsWith("female/")).length;
+    const m=keys.filter(k=>k.startsWith("male/")).length;
+    let usage="";
+    if(navigator.storage?.estimate){
+      const est=await navigator.storage.estimate();
+      usage=` · 사용 용량 약 ${Math.round((est.usage||0)/1024/1024)}MB`;
+    }
+    $("audioStatus").textContent = (f||m)
+      ? `저장된 음원: 여성 ${f}개 / 남성 ${m}개 (전체 684개)${usage}`
+      : "저장된 음원이 없습니다. 음원이 없으면 웹 음원 또는 기기 음성으로 재생됩니다.";
+  }catch(e){ $("audioStatus").textContent=""; }
+}
+async function importAudio(gender, files){
+  if(!files || !files.length) return;
+  try{ await navigator.storage?.persist?.(); }catch(e){}
+  let ok=0, skip=0;
+  toast("음원 저장 중... 화면을 끄지 마세요");
+  for(const f of files){
+    const mm=f.name.match(/^([a-z0-9]+)-(\d+)\.mp3$/i);
+    if(!mm){ skip++; continue; }
+    try{
+      await audioPut(gender+"/"+mm[1].toLowerCase()+"-"+(+mm[2]), f);
+      ok++;
+      if(ok%100===0) toast(`저장 중... ${ok}/${files.length}`);
+    }catch(e){
+      toast("저장 공간이 부족하거나 오류가 발생했습니다 ("+ok+"개 저장됨)");
+      break;
+    }
+  }
+  delete mp3Dead[gender];
+  toast(`완료: ${ok}개 저장${skip?`, ${skip}개 파일명 인식 불가`:""}`);
+  refreshAudioStatus();
+}
+$("btnImportF").onclick=()=>$("fileImportF").click();
+$("btnImportM").onclick=()=>$("fileImportM").click();
+$("fileImportF").onchange=e=>{ importAudio("female", e.target.files); e.target.value=""; };
+$("fileImportM").onchange=e=>{ importAudio("male", e.target.files); e.target.value=""; };
+$("btnAudioClear").onclick=async()=>{
+  if(!confirm("휴대폰에 저장된 낭독 음원을 모두 삭제할까요?")) return;
+  await audioClearAll();
+  toast("저장 음원을 삭제했습니다");
+  refreshAudioStatus();
+};
+refreshAudioStatus();
 
 /* ============================================================
    알림
