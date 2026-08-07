@@ -802,10 +802,13 @@ const store={
 };
 function chKey(c){ return c.id+"-"+c.ch; }
 function isRead(c){ return !!store.read[chKey(c)]; }
+function tombs(){ try{return JSON.parse(localStorage.getItem("btr-del")||"{}")}catch(e){return{}} }
+function saveTombs(t){ localStorage.setItem("btr-del",JSON.stringify(t)); }
 function setRead(c,val){
-  const r=store.read;
-  if(val) r[chKey(c)]=1; else delete r[chKey(c)];
-  store.read=r;
+  const r=store.read, d=tombs(), k=chKey(c);
+  if(val){ r[k]=Date.now(); delete d[k]; }
+  else   { delete r[k]; d[k]=Date.now(); }
+  store.read=r; saveTombs(d);
   scheduleSyncPush();
 }
 function dayDone(sch){ return sch.chapters.every(isRead); }
@@ -1784,16 +1787,30 @@ async function gh(pathname, opts){
   return r.json();
 }
 function localPayload(){
-  return { t: Date.now(), read: store.read,
+  return { t: Date.now(), read: store.read, del: tombs(),
 
   };
 }
 function mergeRemote(remote){
   if(!remote) return;
-  if(remote.read){
-    const r=store.read;
-    Object.keys(remote.read).forEach(k=>{ r[k]=1; });   // 합집합
-    store.read=r;
+  if(remote.read || remote.del){
+    const r=store.read, d=tombs();
+    const keys=new Set([
+      ...Object.keys(remote.read||{}), ...Object.keys(remote.del||{})
+    ]);
+    keys.forEach(k=>{
+      const rr=+(remote.read&&remote.read[k])||0;   // 원격 체크 시각 (구버전 1도 유효)
+      const rd=+(remote.del &&remote.del[k]) ||0;   // 원격 해제 시각
+      const lr=+r[k]||0, ld=+d[k]||0;
+      const best=Math.max(rr,rd,lr,ld);
+      if(!best) return;
+      if(best===rr || best===lr){                    // 체크가 최신(동률 포함) → 읽음 유지
+        r[k]=Math.max(rr,lr)||1; delete d[k];
+      }else{                                         // 해제가 최신 → 해제 유지
+        delete r[k]; d[k]=Math.max(rd,ld);
+      }
+    });
+    store.read=r; saveTombs(d);
   }
 
 }
@@ -1833,8 +1850,11 @@ async function syncNow(silent){
       files:{[SYNC_FILE]:{content:JSON.stringify(localPayload())}}
     })});
     const s=store.settings; s.lastSync=Date.now(); store.settings=s;
-    render(); if(typeof checkAchievements==="function") checkAchievements();
-    if(typeof renderPlanUI==="function") renderPlanUI();
+    if(typeof drag==="undefined" || !drag){
+      render();
+      if(typeof checkAchievements==="function") checkAchievements();
+      if(typeof renderPlanUI==="function") renderPlanUI();
+    }
     renderSyncStatus();
     if(!silent) toast("✓ 동기화 완료");
   }catch(e){
@@ -1888,6 +1908,14 @@ $("fileRec").onchange=async e=>{
   }catch(err){ toast("기록 파일을 인식하지 못했습니다"); }
 };
 if(ghToken()) syncNow(true);   // 앱 시작 시 자동 동기화
+// 다른 앱에 갔다 돌아오면 자동으로 최신 기록 당겨오기 (1분 스로틀)
+let lastVisSync=Date.now();
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden || !ghToken()) return;
+  if(Date.now()-lastVisSync < 60000) return;
+  lastVisSync=Date.now();
+  syncNow(true);
+});
 
 render();
 renderNotiStatus();
