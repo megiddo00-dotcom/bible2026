@@ -1124,7 +1124,7 @@ function loadKRV(){
   return krvLoading;
 }
 
-const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null, mode:null };
+const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null, mode:null, token:0 };
 const audioEl=new Audio();
 audioEl.preload="auto";
 const mp3Dead={};   // 성별별: 음원 404 시 세션 내 재시도 방지
@@ -1261,6 +1261,7 @@ async function tryMp3(){
 
 /* ---- TTS 폴백 ---- */
 function fallbackTTS(markDead){
+  if(reader.mode==="tts") return;   // error 이벤트 + play() 실패 동시 발생 시 중복 방지
   if(markDead && !mp3Dead[voiceGender()]){
     mp3Dead[voiceGender()]=true;
     toast("낭독 음원을 찾지 못해 기기 음성으로 재생합니다");
@@ -1280,8 +1281,9 @@ function speakFrom(vi){
   u.lang="ko-KR";
   const v=koVoice(); if(v) u.voice=v;
   u.rate=ttsRate();
-  u.onend=()=>{ if(reader.playing && reader.mode==="tts") speakFrom(vi+1); };
-  u.onerror=()=>{ if(reader.playing && reader.mode==="tts") speakFrom(vi+1); };
+  const tk=reader.token;
+  u.onend=()=>{ if(tk===reader.token && reader.playing && reader.mode==="tts") speakFrom(vi+1); };
+  u.onerror=()=>{ if(tk===reader.token && reader.playing && reader.mode==="tts") speakFrom(vi+1); };
   speechSynthesis.speak(u);
 }
 
@@ -1302,6 +1304,8 @@ function chapterDone(){
 }
 async function startPlayback(){
   reader.playing=true;
+  reader.token++;
+  reader.mode=null;
   updatePlayBtn();
   speechSynthesis.cancel();
   if(mp3Dead[voiceGender()]) fallbackTTS(false);
@@ -1310,6 +1314,7 @@ async function startPlayback(){
 }
 function stopPlayback(keepPos){
   reader.playing=false;
+  reader.token++;
   updatePlayBtn();
   audioEl.pause();
   if(!keepPos){ delete audioEl.dataset.key; try{audioEl.currentTime=0;}catch(e){} }
@@ -1333,7 +1338,7 @@ $("rdPrev").onclick=()=>jumpChapter(-1);
 $("rdNext").onclick=()=>jumpChapter(1);
 $("rdRate").onchange=()=>{
   if(reader.mode==="mp3"){ audioEl.playbackRate=ttsRate(); }
-  else if(reader.playing){ speechSynthesis.cancel(); speakFrom(reader.vi); }
+  else if(reader.playing){ reader.token++; speechSynthesis.cancel(); speakFrom(reader.vi); }
 };
 $("rdVoice").onchange=()=>{
   const s=store.settings; s.voiceGender=$("rdVoice").value; store.settings=s;
