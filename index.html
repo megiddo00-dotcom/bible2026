@@ -525,6 +525,13 @@ nav.tabbar{
           <div class="set-desc" id="easyStatus" style="margin-top:8px"></div>
           <input type="file" id="fileEasy" accept=".json,application/json" hidden>
         </div>
+        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="flex:1">
+            <div class="set-title">📱 읽는 동안 화면 항상 켜기</div>
+            <div class="set-desc">음성 재생이 없어도 읽기 화면이 열려 있으면 화면이 꺼지지 않습니다. 끄면 재생 중에만 유지됩니다. (켜두면 배터리 소모 증가)</div>
+          </div>
+          <button class="time-chip" id="keepAwakeBtn" style="flex-shrink:0">켜짐</button>
+        </div>
       </div>
       <div class="set-row">
         <div>
@@ -583,7 +590,7 @@ nav.tabbar{
     <button class="rd-main" id="rdPlay">▶ 재생</button>
     <button id="rdNext">다음 장 ⏭</button>
   </div>
-  <div class="rd-hint">장이 끝나면 자동 체크 후 다음 장으로 이어집니다 · 개역한글 낭독(남/여 선택) · 재생 중 화면 꺼짐 방지</div>
+  <div class="rd-hint">장이 끝나면 자동 체크 후 다음 장으로 이어집니다 · 개역한글 낭독(남/여 선택) · 읽기 화면이 열려 있는 동안 화면 꺼짐 방지</div>
 </div>
 
 <div id="toast"></div>
@@ -1193,6 +1200,17 @@ async function easyClear(){
 }
 
 const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null, mode:null, token:0 };
+function keepAwakeOn(){ return store.settings.keepAwake !== false; }   // 기본: 켜짐
+async function acquireWakeLock(){
+  if(reader.wakeLock) return;
+  try{
+    reader.wakeLock=await navigator.wakeLock.request("screen");
+    reader.wakeLock.addEventListener("release",()=>{ reader.wakeLock=null; });
+  }catch(e){}
+}
+function releaseWakeLock(){
+  if(reader.wakeLock){ reader.wakeLock.release().catch(()=>{}); reader.wakeLock=null; }
+}
 const audioEl=new Audio();
 audioEl.preload="auto";
 const mp3Dead={};   // 성별별: 음원 404 시 세션 내 재시도 방지
@@ -1214,6 +1232,7 @@ async function openReader(startCi){
   reader.qi=Math.max(0,Math.min(startCi,sch.chapters.length-1));
   reader.vi=0;
   reader.open=true;
+  if(keepAwakeOn()) acquireWakeLock();   // 설정이 켜져 있으면 읽는 동안 화면 유지
   await easyLoad();
   $("rdEasyBtn").style.display = EASY ? "" : "none";
   $("rdVoice").value=voiceGender();
@@ -1387,7 +1406,7 @@ async function startPlayback(){
   speechSynthesis.cancel();
   if(mp3Dead[voiceGender()]) fallbackTTS(false);
   else tryMp3();
-  try{ reader.wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
+  acquireWakeLock();
 }
 function stopPlayback(keepPos){
   reader.playing=false;
@@ -1396,7 +1415,7 @@ function stopPlayback(keepPos){
   audioEl.pause();
   if(!keepPos){ delete audioEl.dataset.key; try{audioEl.currentTime=0;}catch(e){} }
   speechSynthesis.cancel();
-  if(reader.wakeLock){ reader.wakeLock.release().catch(()=>{}); reader.wakeLock=null; }
+  if(!keepAwakeOn()) releaseWakeLock();
 }
 function updatePlayBtn(){
   $("rdPlay").textContent = reader.playing ? "⏸ 일시정지" : "▶ 재생";
@@ -1440,6 +1459,7 @@ $("rdEasyBtn").onclick=()=>{
 };
 $("rdClose").onclick=()=>{
   stopPlayback(false);
+  releaseWakeLock();
   reader.open=false;
   $("reader").hidden=true;
 };
@@ -1450,9 +1470,7 @@ $("btnListenDay").onclick=()=>{
   openReader(start).then(()=>{ if(reader.open) startPlayback(); });
 };
 document.addEventListener("visibilitychange",()=>{
-  if(!document.hidden && reader.playing && !reader.wakeLock){
-    navigator.wakeLock?.request("screen").then(w=>reader.wakeLock=w).catch(()=>{});
-  }
+  if(!document.hidden && reader.open && (keepAwakeOn() || reader.playing)) acquireWakeLock();
 });
 
 /* ---- 음원 가져오기 / 관리 ---- */
@@ -1523,6 +1541,22 @@ $("btnEasyClear").onclick=async()=>{
   refreshEasyStatus();
 };
 refreshEasyStatus();
+function renderKeepAwake(){
+  const on=keepAwakeOn();
+  const b=$("keepAwakeBtn");
+  b.classList.toggle("on",on);
+  b.textContent=on?"켜짐":"꺼짐";
+}
+$("keepAwakeBtn").onclick=()=>{
+  const s=store.settings; s.keepAwake=!keepAwakeOn(); store.settings=s;
+  renderKeepAwake();
+  if(reader.open){
+    if(keepAwakeOn() || reader.playing) acquireWakeLock();
+    else releaseWakeLock();
+  }
+  toast(keepAwakeOn() ? "읽기 화면에서 화면이 항상 켜집니다" : "음성 재생 중에만 화면을 유지합니다");
+};
+renderKeepAwake();
 $("btnImportF").onclick=()=>$("fileImportF").click();
 $("btnImportM").onclick=()=>$("fileImportM").click();
 $("fileImportF").onchange=e=>{ importAudio("female", e.target.files); e.target.value=""; };
