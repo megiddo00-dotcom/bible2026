@@ -1,11 +1,12 @@
 /* 말씀의 여정 - Service Worker */
-const CACHE = "btr-v2";
+const CACHE = "btr-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./icon-192.png",
-  "./icon-512.png"
+  "./icon-512.png",
+  "./badge-96.png"
 ];
 
 self.addEventListener("install", e => {
@@ -93,9 +94,10 @@ async function checkAndNotify() {
   await self.registration.showNotification("📖 오늘 말씀, 아직 남았어요", {
     body: `오후 11시 전까지 ${state.left}장이 남았습니다 · ${state.range}`,
     icon: "icon-192.png",
-    badge: "icon-192.png",
+    badge: "badge-96.png",
     tag: "btr-reminder",
-    vibrate: [100, 50, 100]
+    vibrate: [100, 50, 100],
+    requireInteraction: true
   });
 }
 

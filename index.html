@@ -414,6 +414,15 @@ nav.tabbar{
         </div>
         <button class="btn-outline" id="btnNotiTest">테스트</button>
       </div>
+      <div class="set-row" style="display:block">
+        <div class="set-title">📢 알림이 화면에 팝업으로 안 뜬다면</div>
+        <div class="set-desc">
+          안드로이드 기본 설정에서는 알림이 상단바에만 표시될 수 있습니다. 한 번만 설정하면 팝업으로 바뀝니다:<br>
+          ① 위의 <b>테스트</b>로 알림을 받은 뒤 상단바를 내려 <b>알림을 길게 누르기</b><br>
+          ② 알림 유형을 <b>"소리 및 팝업"</b>(중요도 '긴급')으로 변경<br>
+          또는: 휴대폰 설정 → 애플리케이션 → Chrome(설치했다면 '말씀의 여정') → 알림 → 이 사이트 채널 → "소리 및 팝업" 선택
+        </div>
+      </div>
       <div class="set-row">
         <div>
           <div class="set-title">기록 초기화</div>
@@ -1024,7 +1033,7 @@ $("btnNotiTest").onclick=async()=>{
   const reg=await navigator.serviceWorker.ready;
   reg.showNotification("📖 말씀의 여정",{
     body:"알림이 정상 작동합니다. 오늘도 말씀과 함께!",
-    icon:"icon-192.png", badge:"icon-192.png", tag:"btr-test"
+    icon:"icon-192.png", badge:"badge-96.png", tag:"btr-test"
   });
 };
 
@@ -1046,8 +1055,8 @@ function scheduleInPageReminder(){
         const reg=await navigator.serviceWorker.ready;
         reg.showNotification("📖 오늘 말씀, 아직 남았어요",{
           body:`오후 11시 전까지 ${left}장이 남았습니다 · ${rangeLabel(sch)}`,
-          icon:"icon-192.png", badge:"icon-192.png", tag:"btr-reminder",
-          vibrate:[100,50,100]
+          icon:"icon-192.png", badge:"badge-96.png", tag:"btr-reminder",
+          vibrate:[100,50,100], requireInteraction:true
         });
       }
     }
