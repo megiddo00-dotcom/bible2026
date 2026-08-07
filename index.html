@@ -369,6 +369,14 @@ nav.tabbar{
 /* 완료 축하 */
 @keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
 .day-complete-badge.show{animation:pop .4s ease}
+/* 태블릿·가로 화면 대응 */
+@media (min-width:760px){
+  main{max-width:680px}
+  html{font-size:17px}
+  .reader-body{padding-left:max(20px, calc(50% - 340px));padding-right:max(20px, calc(50% - 340px))}
+  .reader-head, .reader-ctrl, .rd-hint{padding-left:max(16px, calc(50% - 340px));padding-right:max(16px, calc(50% - 340px))}
+  nav.tabbar{padding-left:calc(50% - 340px);padding-right:calc(50% - 340px)}
+}
 @media (prefers-reduced-motion: reduce){
   *{transition:none!important;animation:none!important}
 }
@@ -533,6 +541,23 @@ nav.tabbar{
             <div class="set-desc">음성 재생이 없어도 읽기 화면이 열려 있으면 화면이 꺼지지 않습니다. 끄면 재생 중에만 유지됩니다. (켜두면 배터리 소모 증가)</div>
           </div>
           <button class="time-chip" id="keepAwakeBtn" style="flex-shrink:0">켜짐</button>
+        </div>
+      </div>
+      <div class="set-row" style="display:block">
+        <div class="set-title">🔄 기기 간 동기화 (폰 ↔ 태블릿)</div>
+        <div class="set-desc">읽은 기록을 여러 기기에서 공유합니다. 두 기기의 기록은 <b>합집합으로 합쳐져</b> 어느 쪽에서 읽었든 모두 반영됩니다.</div>
+        <div class="set-desc" style="margin-top:10px;font-weight:700;color:var(--ink)">자동 동기화 (GitHub 비공개 Gist)</div>
+        <div class="set-desc">github.com → Settings → Developer settings → Personal access tokens 에서 <b>gist 권한만 있는 토큰</b>을 만들어 양쪽 기기에 입력하세요. 앱을 열 때마다 자동으로 동기화됩니다.</div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <input type="password" id="ghToken" placeholder="GitHub 토큰 (gist 권한)" style="flex:1;min-width:170px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.85rem;font-family:var(--sans)">
+          <button class="btn-outline" id="btnSyncNow">지금 동기화</button>
+        </div>
+        <div class="set-desc" id="syncStatus" style="margin-top:6px"></div>
+        <div class="set-desc" style="margin-top:12px;font-weight:700;color:var(--ink)">수동 백업 (파일)</div>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn-outline" id="btnExport">기록 내보내기</button>
+          <button class="btn-outline" id="btnImportRec">기록 가져오기</button>
+          <input type="file" id="fileRec" accept=".json,application/json" hidden>
         </div>
       </div>
       <div class="set-row">
@@ -781,6 +806,7 @@ function setRead(c,val){
   const r=store.read;
   if(val) r[chKey(c)]=1; else delete r[chKey(c)];
   store.read=r;
+  scheduleSyncPush();
 }
 function dayDone(sch){ return sch.chapters.every(isRead); }
 function dayReadCount(sch){ return sch.chapters.filter(isRead).length; }
@@ -1742,6 +1768,127 @@ document.addEventListener("visibilitychange",()=>{
 /* ============================================================
    시작
 ============================================================ */
+/* ============================================================
+   기기 간 동기화 (GitHub Gist) + 파일 백업
+============================================================ */
+const SYNC_MARK="bible-tracker-sync";
+const SYNC_FILE="btr.json";
+function ghToken(){ return (store.settings.ghToken||"").trim(); }
+async function gh(pathname, opts){
+  const r=await fetch("https://api.github.com"+pathname, {
+    ...(opts||{}),
+    headers:{ "Authorization":"Bearer "+ghToken(), "Accept":"application/vnd.github+json",
+      ...(opts&&opts.body?{"Content-Type":"application/json"}:{}) }
+  });
+  if(!r.ok) throw new Error("gh "+r.status);
+  return r.json();
+}
+function localPayload(){
+  return { t: Date.now(), read: store.read,
+
+  };
+}
+function mergeRemote(remote){
+  if(!remote) return;
+  if(remote.read){
+    const r=store.read;
+    Object.keys(remote.read).forEach(k=>{ r[k]=1; });   // 합집합
+    store.read=r;
+  }
+
+}
+async function findOrCreateGist(){
+  const s=store.settings;
+  if(s.gistId){
+    try{ return await gh("/gists/"+s.gistId); }catch(e){ delete s.gistId; store.settings=s; }
+  }
+  const list=await gh("/gists?per_page=100");
+  const found=list.find(g=>g.description===SYNC_MARK);
+  if(found){ s.gistId=found.id; store.settings=s; return await gh("/gists/"+found.id); }
+  const created=await gh("/gists",{method:"POST",body:JSON.stringify({
+    description:SYNC_MARK, public:false,
+    files:{[SYNC_FILE]:{content:JSON.stringify(localPayload())}}
+  })});
+  s.gistId=created.id; store.settings=s;
+  return created;
+}
+let syncing=false;
+async function syncNow(silent){
+  if(!ghToken()){ if(!silent) toast("먼저 GitHub 토큰을 입력하세요"); return; }
+  if(syncing) return;
+  syncing=true;
+  const st=$("syncStatus");
+  try{
+    if(st) st.textContent="동기화 중...";
+    const gist=await findOrCreateGist();
+    const f=gist.files && gist.files[SYNC_FILE];
+    let remote=null;
+    if(f){
+      let content=f.content;
+      if(f.truncated){ content=await (await fetch(f.raw_url)).text(); }
+      try{ remote=JSON.parse(content); }catch(e){}
+    }
+    mergeRemote(remote);
+    await gh("/gists/"+gist.id,{method:"PATCH",body:JSON.stringify({
+      files:{[SYNC_FILE]:{content:JSON.stringify(localPayload())}}
+    })});
+    const s=store.settings; s.lastSync=Date.now(); store.settings=s;
+    render(); if(typeof checkAchievements==="function") checkAchievements();
+    if(typeof renderPlanUI==="function") renderPlanUI();
+    renderSyncStatus();
+    if(!silent) toast("✓ 동기화 완료");
+  }catch(e){
+    if(st) st.textContent="동기화 실패: 토큰 권한(gist)과 인터넷 연결을 확인하세요";
+    if(!silent) toast("동기화 실패");
+  }finally{ syncing=false; }
+}
+let syncPushTimer=null;
+function scheduleSyncPush(){
+  if(!ghToken()) return;
+  clearTimeout(syncPushTimer);
+  syncPushTimer=setTimeout(()=>syncNow(true), 20000);   // 변경 20초 후 자동 반영
+}
+function renderSyncStatus(){
+  const st=$("syncStatus");
+  if(!st) return;
+  if(!ghToken()){ st.textContent="토큰을 입력하면 자동 동기화가 켜집니다."; return; }
+  const t=store.settings.lastSync;
+  st.textContent="✓ 연결됨"+(t?` · 마지막 동기화 ${new Date(t).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`:"");
+}
+$("ghToken").value=ghToken();
+$("ghToken").onchange=()=>{
+  const s=store.settings; s.ghToken=$("ghToken").value.trim(); delete s.gistId; store.settings=s;
+  renderSyncStatus();
+  if(ghToken()){ toast("토큰 저장됨 — 동기화를 시작합니다"); syncNow(true); }
+};
+$("btnSyncNow").onclick=()=>syncNow(false);
+renderSyncStatus();
+
+// 파일 백업
+$("btnExport").onclick=()=>{
+  const blob=new Blob([JSON.stringify(localPayload())],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="말씀의여정_기록_"+dateKey(new Date())+".json";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  toast("기록 파일을 내려받았습니다");
+};
+$("btnImportRec").onclick=()=>$("fileRec").click();
+$("fileRec").onchange=async e=>{
+  const f=e.target.files[0]; e.target.value="";
+  if(!f) return;
+  try{
+    const obj=JSON.parse(await f.text());
+    if(!obj || !obj.read) throw new Error("format");
+    mergeRemote(obj);
+    render(); if(typeof checkAchievements==="function") checkAchievements();
+    toast("✓ 기록을 합쳤습니다");
+    scheduleSyncPush();
+  }catch(err){ toast("기록 파일을 인식하지 못했습니다"); }
+};
+if(ghToken()) syncNow(true);   // 앱 시작 시 자동 동기화
+
 render();
 renderNotiStatus();
 scheduleInPageReminder();
