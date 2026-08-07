@@ -1035,7 +1035,7 @@ $("btnNotiTest").onclick=async()=>{
     reg.showNotification("📖 말씀의 여정",{
       body:"알림이 정상 작동합니다. 오늘도 말씀과 함께!",
       icon:"icon-192.png", badge:"badge-96.png", tag:"btr-test",
-      vibrate:[100,50,100], requireInteraction:true
+      renotify:true, vibrate:[100,50,100], requireInteraction:true
     });
   },5000);
 };
@@ -1059,7 +1059,7 @@ function scheduleInPageReminder(){
         reg.showNotification("📖 오늘 말씀, 아직 남았어요",{
           body:`오후 11시 전까지 ${left}장이 남았습니다 · ${rangeLabel(sch)}`,
           icon:"icon-192.png", badge:"badge-96.png", tag:"btr-reminder",
-          vibrate:[100,50,100], requireInteraction:true
+          renotify:true, vibrate:[100,50,100], requireInteraction:true
         });
       }
     }

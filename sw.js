@@ -1,5 +1,5 @@
 /* 말씀의 여정 - Service Worker */
-const CACHE = "btr-v4";
+const CACHE = "btr-v5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -96,6 +96,7 @@ async function checkAndNotify() {
     icon: "icon-192.png",
     badge: "badge-96.png",
     tag: "btr-reminder",
+    renotify: true,
     vibrate: [100, 50, 100],
     requireInteraction: true
   });
