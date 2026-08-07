@@ -1,31 +1,17 @@
 {
-  "name": "성경 1독 · 2026",
-  "short_name": "성경1독",
+  "name": "말씀의 여정 — 성경읽기 체크",
+  "short_name": "말씀의 여정",
+  "description": "시편 28편부터 시작하는 성경 1독 체크. 구약 9/11, 신약 11/30 완독 목표",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5F6F8",
-  "theme_color": "#3651D4",
+  "background_color": "#F3F5F1",
+  "theme_color": "#1F5C46",
   "lang": "ko",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
