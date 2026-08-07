@@ -253,6 +253,14 @@ select{
   border:1px solid var(--line);border-radius:12px;padding:9px 12px;
   font-size:.9rem;font-family:var(--sans);background:#fff;color:var(--ink);
 }
+.time-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.time-chip{
+  border:1px solid var(--line);background:#FBFCFA;color:var(--ink);
+  font-family:var(--sans);font-size:.85rem;font-weight:500;
+  border-radius:20px;padding:8px 14px;cursor:pointer;white-space:nowrap;
+}
+.time-chip.on{background:var(--ot);border-color:var(--ot);color:#fff;font-weight:700}
+.nt-phase-ui .time-chip.on{background:var(--nt);border-color:var(--nt)}
 .noti-status{font-size:.78rem;margin-top:6px;font-weight:700}
 .noti-status.on{color:var(--ot)}
 .noti-status.off{color:var(--danger)}
@@ -273,6 +281,62 @@ nav.tabbar{
 .nt-phase-ui .tab-btn.active{color:var(--nt)}
 .tab-page{display:none}
 .tab-page.active{display:block}
+
+/* ---------- 본문 읽기/듣기 ---------- */
+.ch-play{
+  border:1px solid var(--line);background:#fff;border-radius:50%;
+  width:34px;height:34px;flex-shrink:0;cursor:pointer;color:var(--ot);
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;padding:0;
+}
+.nt-phase-ui .ch-play{color:var(--nt)}
+.btn-listen-day{
+  width:100%;margin-top:14px;border:none;border-radius:14px;padding:13px;
+  background:var(--ot);color:#fff;font-weight:700;font-size:.92rem;
+  font-family:var(--sans);cursor:pointer;
+}
+.nt-phase-ui .btn-listen-day{background:var(--nt)}
+.reader{
+  position:fixed;inset:0;z-index:200;background:var(--bg);
+  display:flex;flex-direction:column;
+}
+.reader[hidden]{display:none}
+.reader-head{
+  display:flex;align-items:center;gap:10px;
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  background:var(--card);border-bottom:1px solid var(--line);
+}
+.rd-close{
+  border:none;background:#EFF2EE;border-radius:50%;width:36px;height:36px;
+  font-size:1rem;cursor:pointer;color:var(--ink);flex-shrink:0;
+}
+.rd-title{flex:1;font-family:var(--serif);font-weight:700;font-size:1.05rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-rate{border:1px solid var(--line);border-radius:10px;padding:7px 8px;font-size:.85rem;background:#fff;font-family:var(--sans)}
+.reader-body{
+  flex:1;overflow-y:auto;padding:18px 20px 24px;line-height:1.9;font-size:1.02rem;
+  word-break:keep-all;
+}
+.rd-verse{margin-bottom:2px}
+.rd-verse .vn{
+  color:var(--ink-soft);font-size:.7rem;font-weight:700;vertical-align:super;margin-right:4px;
+}
+.rd-verse.now{background:var(--gold-soft);border-radius:6px;box-shadow:0 0 0 4px var(--gold-soft)}
+.reader-ctrl{
+  display:flex;gap:8px;padding:12px 16px;background:var(--card);
+  border-top:1px solid var(--line);
+}
+.reader-ctrl button{
+  border:1px solid var(--line);background:#FBFCFA;border-radius:14px;
+  padding:13px 10px;font-size:.85rem;font-weight:500;font-family:var(--sans);
+  cursor:pointer;color:var(--ink);flex:1;white-space:nowrap;
+}
+.reader-ctrl .rd-main{
+  flex:1.6;background:var(--ot);border-color:var(--ot);color:#fff;font-weight:700;font-size:.95rem;
+}
+.nt-phase-ui .reader-ctrl .rd-main{background:var(--nt);border-color:var(--nt)}
+.rd-hint{
+  padding:0 16px calc(12px + env(safe-area-inset-bottom));background:var(--card);
+  font-size:.72rem;color:var(--ink-soft);text-align:center;line-height:1.5;
+}
 /* 토스트 */
 #toast{
   position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));
@@ -362,6 +426,7 @@ nav.tabbar{
           <div class="ts-label">남음</div>
         </div>
       </div>
+      <button class="btn-listen-day" id="btnListenDay">🔊 이어서 읽어주기</button>
     </div>
 
     <div class="card">
@@ -388,16 +453,12 @@ nav.tabbar{
     <div class="card">
       <div class="set-row" style="display:block">
         <div class="set-title">🔔 저녁 알림</div>
-        <div class="set-desc">오후 11시 전까지 오늘 분량을 다 읽지 못했다면 알림을 보냅니다.<br>알림을 받으려면 먼저 권한을 허용해 주세요.</div>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+        <div class="set-desc">선택한 시간에 오늘 분량이 남아 있으면 알림을 보냅니다.<br>알림을 받으려면 먼저 권한을 허용해 주세요.</div>
+        <div style="margin-top:12px">
           <button class="btn-primary" id="btnNotiPerm">알림 권한 허용</button>
-          <select id="reminderTime">
-            <option value="20">오후 8시</option>
-            <option value="21" selected>오후 9시</option>
-            <option value="22">오후 10시</option>
-            <option value="22.5">오후 10시 30분</option>
-          </select>
         </div>
+        <div class="set-desc" style="margin-top:14px">알림 받을 시간 (여러 개 선택 가능)</div>
+        <div class="time-chips" id="timeChips"></div>
         <div class="noti-status" id="notiStatus"></div>
       </div>
       <div class="set-row">
@@ -455,6 +516,27 @@ nav.tabbar{
     알림 설정
   </button>
 </nav>
+
+
+<div class="reader" id="reader" hidden>
+  <div class="reader-head">
+    <button class="rd-close" id="rdClose" aria-label="닫기">✕</button>
+    <div class="rd-title" id="rdTitle"></div>
+    <select class="rd-rate" id="rdRate">
+      <option value="0.8">0.8배속</option>
+      <option value="1" selected>1.0배속</option>
+      <option value="1.2">1.2배속</option>
+      <option value="1.5">1.5배속</option>
+    </select>
+  </div>
+  <div class="reader-body" id="rdBody"></div>
+  <div class="reader-ctrl">
+    <button id="rdPrev">⏮ 이전 장</button>
+    <button class="rd-main" id="rdPlay">▶ 재생</button>
+    <button id="rdNext">다음 장 ⏭</button>
+  </div>
+  <div class="rd-hint">장이 끝나면 자동으로 체크되고 다음 장으로 이어집니다 · 개역한글판 · 재생 중에는 화면이 꺼지지 않아요</div>
+</div>
 
 <div id="toast"></div>
 
@@ -754,8 +836,14 @@ function render(){
     item.innerHTML=`
       <div class="chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
       <div class="ch-name">${c.book} ${c.ch}장</div>
-      <div class="ch-verses">${c.verses}절</div>`;
-    const toggle=()=>{
+      <div class="ch-verses">${c.verses}절</div>
+      <button class="ch-play" aria-label="${c.book} ${c.ch}장 읽어주기">🔊</button>`;
+    item.querySelector(".ch-play").addEventListener("click",e=>{
+      e.stopPropagation();
+      openReader(ci);
+    });
+    const toggle=(e)=>{
+      if(e && e.target && e.target.closest && e.target.closest(".ch-play")) return;
       if(suppressClick){ suppressClick=false; return; }
       const was=dayDone(sch);
       setRead(c,!isRead(c));
@@ -767,7 +855,7 @@ function render(){
       }
     };
     item.addEventListener("click",toggle);
-    item.addEventListener("keydown",e=>{ if(e.key===" "||e.key==="Enter"){e.preventDefault();toggle();} });
+    item.addEventListener("keydown",e=>{ if(e.key===" "||e.key==="Enter"){e.preventDefault();toggle(e);} });
     list.appendChild(item);
   });
   $("btnCheckAll").textContent = dayDone(sch)?"전체 해제":"전체 체크";
@@ -955,6 +1043,7 @@ function dragStart(originItem){
   if(navigator.vibrate) navigator.vibrate(30);
 }
 chListEl.addEventListener("pointerdown",e=>{
+  if(e.target.closest(".ch-play")) return;
   const item=e.target.closest(".chapter-item");
   if(!item) return;
   drag={active:false,moved:false,applied:new Set(),startX:e.clientX,startY:e.clientY};
@@ -1000,15 +1089,189 @@ chListEl.addEventListener("pointercancel",dragEnd);
 chListEl.addEventListener("touchmove",e=>{ if(drag && drag.active) e.preventDefault(); },{passive:false});
 
 /* ============================================================
+   개역한글 읽어주기 (Web Speech API)
+============================================================ */
+let KRV=null, krvLoading=null;
+function loadKRV(){
+  if(KRV) return Promise.resolve(KRV);
+  if(krvLoading) return krvLoading;
+  toast("본문을 불러오는 중...");
+  krvLoading=fetch("krv.json").then(r=>{
+    if(!r.ok) throw new Error("load fail");
+    return r.json();
+  }).then(j=>{ KRV=j; return j; })
+    .catch(e=>{ krvLoading=null; toast("본문을 불러오지 못했습니다. 인터넷 연결을 확인하세요."); throw e; });
+  return krvLoading;
+}
+
+const reader={ open:false, queue:[], qi:0, vi:0, playing:false, wakeLock:null };
+
+function koVoice(){
+  const vs=speechSynthesis.getVoices();
+  return vs.find(v=>/^ko/i.test(v.lang)) || null;
+}
+if("speechSynthesis" in window){
+  speechSynthesis.onvoiceschanged=()=>{};
+}
+
+async function openReader(startCi){
+  if(!("speechSynthesis" in window)){
+    toast("이 브라우저는 음성 읽기를 지원하지 않습니다"); return;
+  }
+  try{ await loadKRV(); }catch(e){ return; }
+  const sch=SCHEDULE[viewIndex];
+  reader.queue=sch.chapters;
+  reader.qi=Math.max(0,Math.min(startCi,sch.chapters.length-1));
+  reader.vi=0;
+  reader.open=true;
+  $("reader").hidden=false;
+  renderReaderChapter();
+}
+
+function readerChapter(){ return reader.queue[reader.qi]; }
+function readerVerses(){
+  const c=readerChapter();
+  return (KRV[c.id] && KRV[c.id][String(c.ch)]) || [];
+}
+
+function renderReaderChapter(){
+  const c=readerChapter();
+  $("rdTitle").textContent=`${c.book} ${c.ch}장 (${reader.qi+1}/${reader.queue.length})`;
+  const body=$("rdBody");
+  body.innerHTML="";
+  readerVerses().forEach((v,i)=>{
+    const p=document.createElement("p");
+    p.className="rd-verse"; p.id="rdv-"+i;
+    p.innerHTML=`<span class="vn">${i+1}</span>${v}`;
+    body.appendChild(p);
+  });
+  body.scrollTop=0;
+  updatePlayBtn();
+}
+
+function highlightVerse(i){
+  document.querySelectorAll(".rd-verse.now").forEach(el=>el.classList.remove("now"));
+  const el=$("rdv-"+i);
+  if(el){ el.classList.add("now"); el.scrollIntoView({block:"center",behavior:"smooth"}); }
+}
+
+function speakFrom(vi){
+  const verses=readerVerses();
+  if(vi>=verses.length){ chapterDone(); return; }
+  reader.vi=vi;
+  highlightVerse(vi);
+  const u=new SpeechSynthesisUtterance(verses[vi]);
+  u.lang="ko-KR";
+  const v=koVoice(); if(v) u.voice=v;
+  u.rate=parseFloat($("rdRate").value);
+  u.onend=()=>{ if(reader.playing) speakFrom(vi+1); };
+  u.onerror=()=>{ if(reader.playing) speakFrom(vi+1); };
+  speechSynthesis.speak(u);
+}
+
+function chapterDone(){
+  const c=readerChapter();
+  if(!isRead(c)){ setRead(c,true); render(); syncToSW(); }
+  if(reader.qi+1<reader.queue.length){
+    reader.qi++; reader.vi=0;
+    renderReaderChapter();
+    if(reader.playing) speakFrom(0);
+  }else{
+    stopSpeak();
+    toast("🎉 오늘 분량 읽어주기 완료!");
+    if(navigator.vibrate) navigator.vibrate([60,40,60]);
+  }
+}
+
+async function startSpeak(){
+  reader.playing=true;
+  speechSynthesis.cancel();
+  speakFrom(reader.vi);
+  updatePlayBtn();
+  try{ reader.wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
+}
+function stopSpeak(){
+  reader.playing=false;
+  speechSynthesis.cancel();
+  updatePlayBtn();
+  if(reader.wakeLock){ reader.wakeLock.release().catch(()=>{}); reader.wakeLock=null; }
+}
+function updatePlayBtn(){
+  $("rdPlay").textContent = reader.playing ? "⏸ 일시정지" : "▶ 재생";
+}
+
+$("rdPlay").onclick=()=>{ reader.playing ? stopSpeak() : startSpeak(); };
+$("rdPrev").onclick=()=>{
+  if(reader.qi>0){ reader.qi--; reader.vi=0; renderReaderChapter(); if(reader.playing){ speechSynthesis.cancel(); speakFrom(0);} }
+};
+$("rdNext").onclick=()=>{
+  if(reader.qi+1<reader.queue.length){ reader.qi++; reader.vi=0; renderReaderChapter(); if(reader.playing){ speechSynthesis.cancel(); speakFrom(0);} }
+};
+$("rdRate").onchange=()=>{
+  if(reader.playing){ speechSynthesis.cancel(); speakFrom(reader.vi); }
+};
+$("rdClose").onclick=()=>{
+  stopSpeak();
+  reader.open=false;
+  $("reader").hidden=true;
+};
+$("btnListenDay").onclick=()=>{
+  const sch=SCHEDULE[viewIndex];
+  let start=sch.chapters.findIndex(c=>!isRead(c));
+  if(start<0) start=0;
+  openReader(start).then(()=>startSpeak());
+};
+// 화면 복귀 시 wake lock 재획득
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden && reader.playing && !reader.wakeLock){
+    navigator.wakeLock?.request("screen").then(w=>reader.wakeLock=w).catch(()=>{});
+  }
+});
+
+/* ============================================================
    알림
 ============================================================ */
-const reminderSel=$("reminderTime");
-reminderSel.value = store.settings.reminderHour ?? "21";
-reminderSel.onchange=()=>{
-  const s=store.settings; s.reminderHour=reminderSel.value; store.settings=s;
-  syncToSW(); scheduleInPageReminder();
-  toast("알림 시간이 변경되었습니다");
-};
+const REMIND_OPTIONS=[12+40/60, 22, 22.5, 23];  // 오후 12:40, 10시, 10시 30분, 11시
+function hourLabel(h){
+  const hh=Math.floor(h), mm=Math.round((h%1)*60);
+  const ampm=hh<12?"오전":"오후";
+  const h12=hh%12===0?12:hh%12;
+  return `${ampm} ${h12}시${mm?` ${mm}분`:""}`;
+}
+function getReminderHours(){
+  const s=store.settings;
+  let arr=Array.isArray(s.reminderHours)?s.reminderHours:[];
+  arr=arr.filter(h=>REMIND_OPTIONS.includes(h));   // 선택지에 없는 이전 값 제거
+  return arr.length?arr:REMIND_OPTIONS.slice();    // 기본: 전체 선택
+}
+function setReminderHours(arr){
+  const s=store.settings; s.reminderHours=arr; delete s.reminderHour; store.settings=s;
+}
+function renderTimeChips(){
+  const wrap=$("timeChips");
+  wrap.innerHTML="";
+  const sel=getReminderHours();
+  REMIND_OPTIONS.forEach(h=>{
+    const b=document.createElement("button");
+    b.className="time-chip"+(sel.includes(h)?" on":"");
+    b.textContent=hourLabel(h);
+    b.onclick=()=>{
+      let cur=getReminderHours();
+      if(cur.includes(h)){
+        if(cur.length===1){ toast("알림 시간은 최소 1개 필요합니다"); return; }
+        cur=cur.filter(x=>x!==h);
+      } else {
+        cur=[...cur,h].sort((a,b)=>a-b);
+      }
+      setReminderHours(cur);
+      renderTimeChips();
+      syncToSW(); scheduleInPageReminder();
+      toast("알림 시간: "+cur.map(hourLabel).join(", "));
+    };
+    wrap.appendChild(b);
+  });
+}
+renderTimeChips();
 
 function notiState(){
   if(!("Notification" in window)) return "unsupported";
@@ -1042,13 +1305,23 @@ $("btnNotiTest").onclick=async()=>{
 
 // 페이지가 열려있는 동안의 알림 예약
 let reminderTimer=null;
+function nextReminderTime(){
+  const hours=getReminderHours();
+  const now=new Date();
+  // 오늘 남은 가장 이른 시각, 없으면 내일 첫 시각
+  for(const h of hours){
+    const t=new Date(now); t.setHours(Math.floor(h),Math.round((h%1)*60),0,0);
+    if(t>now) return t;
+  }
+  const h=hours[0];
+  const t=new Date(now); t.setDate(t.getDate()+1); t.setHours(Math.floor(h),Math.round((h%1)*60),0,0);
+  return t;
+}
 function scheduleInPageReminder(){
   clearTimeout(reminderTimer);
   if(notiState()!=="granted") return;
-  const hour=parseFloat(store.settings.reminderHour ?? "21");
+  const t=nextReminderTime();
   const now=new Date();
-  const t=new Date(now); t.setHours(Math.floor(hour), (hour%1)*60, 0, 0);
-  if(t<=now) t.setDate(t.getDate()+1);
   reminderTimer=setTimeout(async()=>{
     if(!isTodayRest()){
       const ti=todayIndex();
@@ -1057,7 +1330,7 @@ function scheduleInPageReminder(){
         const left=sch.chapters.length-dayReadCount(sch);
         const reg=await navigator.serviceWorker.ready;
         reg.showNotification("📖 오늘 말씀, 아직 남았어요",{
-          body:`오후 11시 전까지 ${left}장이 남았습니다 · ${rangeLabel(sch)}`,
+          body:`오늘 분량 ${left}장이 남았습니다 · ${rangeLabel(sch)}`,
           icon:"icon-192.png", badge:"badge-96.png", tag:"btr-reminder",
           renotify:true, vibrate:[100,50,100], requireInteraction:true
         });
@@ -1078,7 +1351,7 @@ async function syncToSW(){
     done:dayDone(sch),
     left:sch.chapters.length-dayReadCount(sch),
     range:rangeLabel(sch),
-    reminderHour:parseFloat(store.settings.reminderHour ?? "21")
+    reminderHours:getReminderHours()
   });
 }
 async function registerPeriodicSync(){

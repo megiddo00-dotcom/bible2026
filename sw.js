@@ -1,5 +1,5 @@
 /* 말씀의 여정 - Service Worker */
-const CACHE = "btr-v5";
+const CACHE = "btr-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -88,11 +88,13 @@ async function checkAndNotify() {
   if (state.done) return;
 
   const hour = now.getHours() + now.getMinutes() / 60;
-  const remindAt = state.reminderHour || 21;
-  if (hour < remindAt || hour >= 23) return;
+  const hours = (Array.isArray(state.reminderHours) && state.reminderHours.length)
+    ? state.reminderHours : [state.reminderHour || 21];
+  // 선택한 시간 중 하나라도 지났으면 알림 (자정에 todayKey가 바뀌며 초기화)
+  if (!hours.some(h => hour >= h)) return;
 
   await self.registration.showNotification("📖 오늘 말씀, 아직 남았어요", {
-    body: `오후 11시 전까지 ${state.left}장이 남았습니다 · ${state.range}`,
+    body: `오늘 분량 ${state.left}장이 남았습니다 · ${state.range}`,
     icon: "icon-192.png",
     badge: "badge-96.png",
     tag: "btr-reminder",
