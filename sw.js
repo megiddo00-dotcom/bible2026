@@ -1,5 +1,5 @@
 /* 말씀의 여정 - Service Worker */
-const CACHE = "btr-v23";
+const CACHE = "btr-v24";
 const ASSETS = [
   "./",
   "./index.html",
