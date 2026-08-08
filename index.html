@@ -574,6 +574,7 @@ nav.tabbar{
       · 신약: 9월 14일(월) 마태복음 → 11월 30일(월) 계시록 완독 — 읽는 날 52일<br>
       · <b>토·일요일과 공휴일·대체공휴일은 쉬는 날</b>입니다: 광복절 연휴(8/15~17), 추석 연휴(9/24~27), 개천절 연휴(10/3~5), 한글날 연휴(10/9~11)<br>
       · 하루 분량은 <b>개역한글판 각 장의 글자수</b>를 기준으로 균등하게 나누었습니다.<br>
+      · <b>앱 버전: 1독 v23</b> — 음원 ZIP 가져오기 지원 버전입니다.<br>
       · 읽기 기록은 기본적으로 이 기기에 저장되며, 동기화를 켜면 본인 GitHub 비공개 Gist를 통해 다른 기기와 공유됩니다.
     </div>
   </section>
@@ -1509,6 +1510,7 @@ document.addEventListener("visibilitychange",()=>{
 });
 
 /* ---- 음원 가져오기 / 관리 ---- */
+let lastImportMsg="";
 async function refreshAudioStatus(){
   try{
     const keys=await audioKeys();
@@ -1519,9 +1521,11 @@ async function refreshAudioStatus(){
       const est=await navigator.storage.estimate();
       usage=` · 사용 용량 약 ${Math.round((est.usage||0)/1024/1024)}MB`;
     }
-    $("audioStatus").textContent = (f||m)
-      ? `저장된 음원: 여성 ${f}개 / 남성 ${m}개 (전체 684개)${usage}`
+    const base = (f||m)
+      ? `저장된 음원: 여성 ${f}개 / 남성 ${m}개${usage}`
       : "저장된 음원이 없습니다. 음원이 없으면 웹 음원 또는 기기 음성으로 재생됩니다.";
+    $("audioStatus").textContent = lastImportMsg ? lastImportMsg + "\n" + base : base;
+    $("audioStatus").style.whiteSpace = "pre-line";
   }catch(e){ $("audioStatus").textContent=""; }
 }
 /* ---- ZIP 해제 (브라우저 내장 DecompressionStream, 라이브러리 불필요) ---- */
@@ -1557,7 +1561,7 @@ async function zipEntryBlob(file, ent){
   const dv=new DataView(lh.buffer, lh.byteOffset, 30);
   const nlen=dv.getUint16(26,true), elen=dv.getUint16(28,true);
   const comp=file.slice(ent.lho+30+nlen+elen, ent.lho+30+nlen+elen+ent.csize);
-  if(ent.method===0) return comp;
+  if(ent.method===0) return new Blob([await comp.arrayBuffer()],{type:"audio/mpeg"});
   if(ent.method===8){
     const st=comp.stream().pipeThrough(new DecompressionStream("deflate-raw"));
     return await new Response(st).blob();
@@ -1569,7 +1573,10 @@ const AUDIO_NAME_RE=/^([a-z0-9]+)-(\d+)(?:\s*\(\d+\))?\.mp3$/i;
 async function importAudio(gender, files){
   if(!files || !files.length) return;
   try{ await navigator.storage?.persist?.(); }catch(e){}
-  let ok=0, skip=0, firstSkip="";
+  let ok=0, skip=0, firstSkip="", errCount=0;
+  const f0=files[0];
+  lastImportMsg=`선택 ${files.length}개 · ${f0.name} (${Math.round((f0.size||0)/1024)}KB${f0.type?", "+f0.type:""})`;
+  refreshAudioStatus();
   toast("음원 저장 중... 화면을 끄지 마세요");
   for(const f of files){
     if(/\.zip$/i.test(f.name)){
@@ -1588,30 +1595,42 @@ async function importAudio(gender, files){
             ok++;
             if(ok%50===0) toast(`저장 중... ${ok}개`);
           }catch(err){
-            toast("저장 공간이 부족하거나 오류가 발생했습니다 ("+ok+"개 저장됨)");
-            found=-1; break;
+            errCount++;
+            lastImportMsg=`⚠ 저장 오류(${base}): ${(err&&err.name)||""} ${(err&&err.message)||err}`;
+            toast(lastImportMsg);
+            if(errCount>=3){ found=-1; break; }
           }
         }
-        if(found===0) toast(`${f.name} 안에서 mp3를 찾지 못했습니다`);
+        if(found===0){ lastImportMsg=`⚠ ${f.name} 안에서 책id-장.mp3 형식 파일을 찾지 못함 (항목 ${ents.length}개)`; toast(lastImportMsg); }
         if(found===-1) break;
       }catch(err){
-        toast("ZIP을 읽지 못했습니다: "+f.name);
+        lastImportMsg=`⚠ ZIP 읽기 실패(${f.name}): ${err && err.message ? err.message : err}`;
+        if(typeof DecompressionStream==="undefined") lastImportMsg+=" · 이 브라우저는 압축 해제 미지원(크롬으로 설치 권장)";
+        toast(lastImportMsg);
       }
     }else{
       const mm=(f.name||"").trim().match(AUDIO_NAME_RE);
       if(!mm){ skip++; if(!firstSkip) firstSkip=f.name||"(이름 없음)"; continue; }
       try{
-        await audioPut(gender+"/"+mm[1].toLowerCase()+"-"+(+mm[2]), f);
+        // 선택기 File은 핸들일 수 있어 실제 바이트로 읽은 뒤 저장 (기기 호환성)
+        const buf=await f.arrayBuffer();
+        await audioPut(gender+"/"+mm[1].toLowerCase()+"-"+(+mm[2]),
+                       new Blob([buf],{type:"audio/mpeg"}));
         ok++;
         if(ok%100===0) toast(`저장 중... ${ok}/${files.length}`);
       }catch(e){
-        toast("저장 공간이 부족하거나 오류가 발생했습니다 ("+ok+"개 저장됨)");
-        break;
+        errCount++;
+        lastImportMsg=`⚠ 저장 오류(${f.name}): ${(e&&e.name)||""} ${(e&&e.message)||e}`;
+        toast(lastImportMsg);
+        if(errCount>=3){ lastImportMsg+=" · 오류 반복으로 중단"; break; }
       }
     }
   }
   delete mp3Dead[gender];
-  toast(`완료: ${ok}개 저장${skip?`, ${skip}개 인식 불가 (예: ${firstSkip})`:""}`);
+  const doneMsg=`완료: ${ok}개 저장${skip?`, ${skip}개 인식 불가 (예: ${firstSkip})`:""}`;
+  if(ok>0) lastImportMsg=doneMsg;
+  else if(!lastImportMsg) lastImportMsg="⚠ "+doneMsg+" — 선택한 파일: "+Array.from(files).map(x=>x.name).slice(0,3).join(", ");
+  toast(doneMsg);
   refreshAudioStatus();
 }
 async function refreshEasyStatus(){
