@@ -515,7 +515,7 @@ nav.tabbar{
         <div class="set-title">🎧 낭독 음원 관리</div>
         <div class="set-desc">
           MP3 낭독 파일을 휴대폰에 저장해두면 인터넷 없이 재생됩니다.<br>
-          PC에서 생성한 audio 폴더의 mp3 파일들을 폰으로 복사한 뒤, 아래 버튼으로 전체 선택해서 가져오세요.
+          권장: 폰의 <b>내 파일</b>에서 female / male 폴더를 각각 <b>길게 눌러 → 압축(ZIP)</b>한 뒤, 아래 버튼으로 <b>ZIP 파일 1개</b>를 선택하세요. (mp3 여러 개를 직접 선택해도 되지만 기기에 따라 500개 제한이 있습니다)
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
           <button class="btn-outline" id="btnImportF">여성 음원 가져오기</button>
@@ -523,8 +523,8 @@ nav.tabbar{
           <button class="btn-outline" id="btnAudioClear" style="color:var(--danger)">저장 음원 삭제</button>
         </div>
         <div class="set-desc" id="audioStatus" style="margin-top:10px"></div>
-        <input type="file" id="fileImportF" accept=".mp3,audio/mpeg" multiple hidden>
-        <input type="file" id="fileImportM" accept=".mp3,audio/mpeg" multiple hidden>
+        <input type="file" id="fileImportF" accept=".mp3,.zip,audio/mpeg,application/zip" multiple hidden>
+        <input type="file" id="fileImportM" accept=".mp3,.zip,audio/mpeg,application/zip" multiple hidden>
         <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
           <div class="set-title">📙 쉬운성경 함께 보기</div>
           <div class="set-desc">쉬운성경.json 파일을 가져오면 읽어주기 화면에서 <b>절을 누르거나 [쉬운성경] 버튼</b>으로 쉬운 번역을 함께 볼 수 있습니다. 파일은 이 기기에만 저장됩니다.</div>
@@ -1524,25 +1524,94 @@ async function refreshAudioStatus(){
       : "저장된 음원이 없습니다. 음원이 없으면 웹 음원 또는 기기 음성으로 재생됩니다.";
   }catch(e){ $("audioStatus").textContent=""; }
 }
+/* ---- ZIP 해제 (브라우저 내장 DecompressionStream, 라이브러리 불필요) ---- */
+async function zipBytes(file, off, len){
+  return new Uint8Array(await file.slice(off, off+len).arrayBuffer());
+}
+async function zipEntries(file){
+  const tailLen=Math.min(65557, file.size);
+  const tail=await zipBytes(file, file.size-tailLen, tailLen);
+  let e=-1;
+  for(let i=tail.length-22;i>=0;i--){
+    if(tail[i]===0x50&&tail[i+1]===0x4b&&tail[i+2]===0x05&&tail[i+3]===0x06){ e=i; break; }
+  }
+  if(e<0) throw new Error("EOCD");
+  const dv=new DataView(tail.buffer, tail.byteOffset+e, 22);
+  const cnt=dv.getUint16(10,true), cdSize=dv.getUint32(12,true), cdOff=dv.getUint32(16,true);
+  const cd=await zipBytes(file, cdOff, cdSize);
+  const d=new DataView(cd.buffer, cd.byteOffset, cd.byteLength);
+  const out=[]; let p=0;
+  const td=new TextDecoder();
+  for(let i=0;i<cnt;i++){
+    if(d.getUint32(p,true)!==0x02014b50) break;
+    const method=d.getUint16(p+10,true), csize=d.getUint32(p+20,true), usize=d.getUint32(p+24,true);
+    const nlen=d.getUint16(p+28,true), elen=d.getUint16(p+30,true), clen=d.getUint16(p+32,true);
+    const lho=d.getUint32(p+42,true);
+    out.push({name: td.decode(cd.subarray(p+46, p+46+nlen)), method, csize, usize, lho});
+    p+=46+nlen+elen+clen;
+  }
+  return out;
+}
+async function zipEntryBlob(file, ent){
+  const lh=await zipBytes(file, ent.lho, 30);
+  const dv=new DataView(lh.buffer, lh.byteOffset, 30);
+  const nlen=dv.getUint16(26,true), elen=dv.getUint16(28,true);
+  const comp=file.slice(ent.lho+30+nlen+elen, ent.lho+30+nlen+elen+ent.csize);
+  if(ent.method===0) return comp;
+  if(ent.method===8){
+    const st=comp.stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return await new Response(st).blob();
+  }
+  throw new Error("method "+ent.method);
+}
+
+const AUDIO_NAME_RE=/^([a-z0-9]+)-(\d+)(?:\s*\(\d+\))?\.mp3$/i;
 async function importAudio(gender, files){
   if(!files || !files.length) return;
   try{ await navigator.storage?.persist?.(); }catch(e){}
-  let ok=0, skip=0;
+  let ok=0, skip=0, firstSkip="";
   toast("음원 저장 중... 화면을 끄지 마세요");
   for(const f of files){
-    const mm=f.name.match(/^([a-z0-9]+)-(\d+)\.mp3$/i);
-    if(!mm){ skip++; continue; }
-    try{
-      await audioPut(gender+"/"+mm[1].toLowerCase()+"-"+(+mm[2]), f);
-      ok++;
-      if(ok%100===0) toast(`저장 중... ${ok}/${files.length}`);
-    }catch(e){
-      toast("저장 공간이 부족하거나 오류가 발생했습니다 ("+ok+"개 저장됨)");
-      break;
+    if(/\.zip$/i.test(f.name)){
+      // ZIP: 폴더째 압축본에서 mp3를 하나씩 풀어 저장 (메모리 안전)
+      try{
+        const ents=await zipEntries(f);
+        let found=0;
+        for(const ent of ents){
+          const base=ent.name.split("/").pop();
+          const mm=base && base.match(AUDIO_NAME_RE);
+          if(!mm || !ent.usize) continue;
+          found++;
+          try{
+            const blob=await zipEntryBlob(f, ent);
+            await audioPut(gender+"/"+mm[1].toLowerCase()+"-"+(+mm[2]), blob);
+            ok++;
+            if(ok%50===0) toast(`저장 중... ${ok}개`);
+          }catch(err){
+            toast("저장 공간이 부족하거나 오류가 발생했습니다 ("+ok+"개 저장됨)");
+            found=-1; break;
+          }
+        }
+        if(found===0) toast(`${f.name} 안에서 mp3를 찾지 못했습니다`);
+        if(found===-1) break;
+      }catch(err){
+        toast("ZIP을 읽지 못했습니다: "+f.name);
+      }
+    }else{
+      const mm=(f.name||"").trim().match(AUDIO_NAME_RE);
+      if(!mm){ skip++; if(!firstSkip) firstSkip=f.name||"(이름 없음)"; continue; }
+      try{
+        await audioPut(gender+"/"+mm[1].toLowerCase()+"-"+(+mm[2]), f);
+        ok++;
+        if(ok%100===0) toast(`저장 중... ${ok}/${files.length}`);
+      }catch(e){
+        toast("저장 공간이 부족하거나 오류가 발생했습니다 ("+ok+"개 저장됨)");
+        break;
+      }
     }
   }
   delete mp3Dead[gender];
-  toast(`완료: ${ok}개 저장${skip?`, ${skip}개 파일명 인식 불가`:""}`);
+  toast(`완료: ${ok}개 저장${skip?`, ${skip}개 인식 불가 (예: ${firstSkip})`:""}`);
   refreshAudioStatus();
 }
 async function refreshEasyStatus(){
